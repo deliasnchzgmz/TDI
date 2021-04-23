@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -15,9 +16,11 @@ import cv2
 import skimage
 import natsort
 import numpy as np
-from skimage import io, color, feature #,filters, etc,
+#from skimage.filters.rank import entropy
+from skimage import io, color, feature, measure #,filters, etc,
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
+from sklearn.model_selection import StratifiedKFold
 import pandas as pd
 
 def imageProcessing(image):
@@ -59,6 +62,10 @@ def imageProcessing(image):
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
     #Añadimos una imagen de bordes con canny a partid de image sharpening
     processed_images["image_bordes"] = feature.canny(processed_images["image_sharpening"], sigma=1)
+    # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
+    processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
+    # Añadimos la mascara de la imagen como una entrada a la variable diccionario
+    processed_images["image_binary"] = processed_images["image_sharpening"]
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     return processed_images
@@ -95,13 +102,47 @@ def extractFeatures(processed_images):
     std_gray = np.std(image_gray)
     features.append(std_gray)
 
-    # Concatenamos todas las features obtenidas (si son más de 1)
-    # features = np.concatenate(feature1, feature2, etc.)
 
     canny = np.sum(processed_images["image_bordes"]==1)
-    features.append(canny)
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    #features = np.concatenate(features, canny)
+    features.append(canny)
+    
+    distances = [4] #Distancia entre los pares de pixeles que iremos acumulando la matriz de co-ocurrencias
+  
+    angles = [0, np.pi/4, np.pi/2, 3*np.pi/4] #Array con los diferentes ángulos (en radianes) que nos indican la orientación a la hora de considerar un píxel vecino
+  
+    properties = ['contrast'] #El contraste sera la propiedad que hallemos a partir de la matriz de co-ocurrencias
+  
+    #Calculamos la matriz de co-ocurrencias normalizada a partir de los parametros anteriormente descritos
+    glcm = feature.texture.greycomatrix(processed_images["image_gray_256"], distances=distances, angles=angles, levels=256, symmetric=True, normed=True)
+  
+    #Calculamos el contraste para las cuatro combinaciones de pares de pixeles según su ángulo
+    #Acumulamos en un array los 4 valores que pasaremos como caracteristicas al clasificador
+    contrast = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties]) 
+    
+    #Contamos el numero de objetos que hay en la imagen con regionprops()
+    label_img = measure.label(processed_images["image_binary"])
+    regions = measure.regionprops(label_img)
+    nregions = len(regions)
+    features.append(nregions)
+    
+    #Calculamos la transformada de fourier y diferentes caracteristicas
+    fourier = np.fft.fft(processed_images["image_gray"])
+    dep = np.abs(fourier) ** 2 #Densidad espectral de potencia
+    fase = np.angle(fourier) #Angulo de fase
+    mediaDep = np.mean(dep)
+    mediaFase = np.mean(fase)
+    desviacionDep = np.std(dep)
+    desviacionFase = np.std(fase)
+    #features.append(mediaFase)
+    #features.append(mediaDep)
+    #features.append(desviacionDep)
+    features.append(desviacionFase)
+    
+    
+    
+    features = np.concatenate((features, contrast))
+    
     return features
 
 def databaseFeatures(db="../data/train"):
@@ -130,7 +171,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 2 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 8 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
@@ -202,8 +243,10 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
     model = MLPClassifier(hidden_layer_sizes=(np.maximum(10,np.ceil(np.shape(X_train)[1]/2).astype('uint8')),
                                               np.maximum(5,np.ceil(np.shape(X_train)[1]/4).astype('uint8'))),
                           max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
-                          learning_rate_init=.1)
+                          learning_rate_init=0.1)
     model.fit(X_train, y_train)
+
+      
     ### - - - - - - - - - - - - - - - - - - - - - - - - -
 
     return scaler, model
