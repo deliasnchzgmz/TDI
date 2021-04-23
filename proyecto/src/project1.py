@@ -15,7 +15,7 @@ import cv2
 import skimage
 import natsort
 import numpy as np
-from skimage import io, color #,filters, etc,
+from skimage import io, color, feature #,filters, etc,
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 import pandas as pd
@@ -52,12 +52,13 @@ def imageProcessing(image):
     processed_images["image"] = image
     # Añadimos la imagen en escala de grises como una entrada a la variable diccionario
     processed_images["image_gray"] = color.rgb2gray(image)
-    #
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
-    #
+    #Añadimos la imagen tras aplicar un filtrado sharpening
     kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
+    #Añadimos un filtrado de Canny
+    processed_images["image_bordes"] = feature.canny(processed_images["image_sharpening"], sigma=1)
     
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     
@@ -97,8 +98,11 @@ def extractFeatures(processed_images):
     
     # Concatenamos todas las features obtenidas (si son más de 1)
     # features = np.concatenate(feature1, feature2, etc.)
-    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     
+    canny = np.sum(processed_images["image_bordes"]==1)
+    features.append(canny)
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    #features = np.concatenate(features, canny)
     return features
   
 def databaseFeatures(db="../data/train"):
@@ -127,7 +131,7 @@ def databaseFeatures(db="../data/train"):
     
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 1 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 2 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
     
     X = np.zeros( (num_images,num_features) )
