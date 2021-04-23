@@ -11,6 +11,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 """
 import os
+import cv2
+import skimage
 import natsort
 import numpy as np
 from skimage import io, color #,filters, etc,
@@ -44,11 +46,19 @@ def imageProcessing(image):
     # El siguiente código implementa el BASELINE incluido en el challenge de
     # Kaggle. 
     # - - - MODIFICAR PARA IMPLEMENTACIÓN DE LA SOLUCIÓN PROPUESTA. - - -
+    
     processed_images = {}
     # Ejemplo: Añadimos la imagen original como una entrada a la variable diccionario
     processed_images["image"] = image
     # Añadimos la imagen en escala de grises como una entrada a la variable diccionario
     processed_images["image_gray"] = color.rgb2gray(image)
+    #
+    # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
+    processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
+    #
+    kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
+    processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
+    
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     
     return processed_images
