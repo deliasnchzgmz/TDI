@@ -54,20 +54,11 @@ def imageProcessing(image):
     processed_images["image_gray"] = color.rgb2gray(image)
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
-<<<<<<< HEAD
-    #Añadimos la imagen tras aplicar un filtrado sharpening
-    kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
-    processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
-    #Añadimos un filtrado de Canny
-    processed_images["image_bordes"] = feature.canny(processed_images["image_sharpening"], sigma=1)
-    
-=======
     #Añadimos la imagen tras aplicar un filtrado de sharpening
     kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
     #Añadimos una imagen de bordes con canny a partid de image sharpening
     processed_images["image_bordes"] = feature.canny(processed_images["image_sharpening"], sigma=1)
->>>>>>> 88677a5772980097d6b49be068bf12ff83089f84
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     return processed_images
@@ -106,16 +97,11 @@ def extractFeatures(processed_images):
 
     # Concatenamos todas las features obtenidas (si son más de 1)
     # features = np.concatenate(feature1, feature2, etc.)
-<<<<<<< HEAD
-    
+
     canny = np.sum(processed_images["image_bordes"]==1)
     features.append(canny)
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     #features = np.concatenate(features, canny)
-=======
-    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
->>>>>>> 88677a5772980097d6b49be068bf12ff83089f84
     return features
 
 def databaseFeatures(db="../data/train"):
