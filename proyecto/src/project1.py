@@ -16,6 +16,7 @@ import cv2
 import skimage
 import natsort
 import numpy as np
+import colorsys
 #from skimage.filters.rank import entropy
 from skimage.transform import hough_line, hough_line_peaks, probabilistic_hough_line
 from skimage import io, color, feature, measure ,filters
@@ -68,12 +69,26 @@ def imageProcessing(image):
     # Añadimos la mascara de la imagen como una entrada a la variable diccionario
     processed_images["image_binary"] = processed_images["image_sharpening"]
     # Añadimos la image en LAB
-    image_lab = color.rgb2lab(color.gray2rgb(image))
+    #image_lab = color.rgb2lab(color.gray2rgb(image))
     
     # Extraemos las componentes de la image_lab
-    processed_images["image_lab_l"] = image_lab[:,:,0]
-    processed_images["image_lab_a"] = image_lab[:,:,1]
-    processed_images["image_lab_b"] = image_lab[:,:,2]
+    #processed_images["image_lab_l"] = image_lab[:,:,0]
+    #processed_images["image_lab_a"] = image_lab[:,:,1]
+    #processed_images["image_lab_b"] = image_lab[:,:,2]
+    
+    # Extraemos las componentes de la image_RGB
+    image_RGB = image
+    if len(image.shape)==2:
+        image_RGB = color.gray2rgb(image)
+    processed_images["image_RGB_R"] = image_RGB[:,:,0]
+    processed_images["image_RGB_G"] = image_RGB[:,:,1]
+    processed_images["image_RGB_B"] = image_RGB[:,:,2]   
+    
+    # Extraemos las componentes de la image_lab
+    image_HSV = color.rgb2hsv(color.gray2rgb(image))
+    #processed_images["image_HSV_H"] = image_HSV[:,:,0]
+    processed_images["image_HSV_S"] = image_HSV[:,:,1]
+    #processed_images["image_HSV_V"] = image_HSV[:,:,2]
     
     # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
     processed_images["image_gray_filtered"] = filters.gaussian(processed_images["image_gray"], sigma=2)
@@ -116,6 +131,7 @@ def extractFeatures(processed_images):
     # baseline, su desviación típica (descriptor muy simple de textura).
     image_gray = processed_images["image_gray"]
     std_gray = np.std(image_gray)
+    #features.append(image_gray)
     features.append(std_gray)
 
 
@@ -144,14 +160,14 @@ def extractFeatures(processed_images):
     
     #Calculamos la transformada de fourier y diferentes caracteristicas
     fourier = np.fft.fft(processed_images["image_gray"])
-    #dep = np.abs(fourier) ** 2 #Densidad espectral de potencia
+    dep = np.abs(fourier) ** 2 #Densidad espectral de potencia
     fase = np.angle(fourier) #Angulo de fase
-    #mediaDep = np.mean(dep)
+    mediaDep = np.mean(dep)
     #mediaFase = np.mean(fase)
     #desviacionDep = np.std(dep)
     desviacionFase = np.std(fase)
     #features.append(mediaFase)
-    #features.append(mediaDep)
+    features.append(mediaDep)
     #features.append(desviacionDep)
     features.append(desviacionFase)
     
@@ -167,7 +183,13 @@ def extractFeatures(processed_images):
     gausscanny = np.sum(processed_images["images_bordes_gauss"]==1)
     #features.append(gausscanny)
     
+    features.append(np.mean(processed_images["image_RGB_R"]))
+    features.append(np.mean(processed_images["image_RGB_G"]))
+    features.append(np.mean(processed_images["image_RGB_B"]))
 
+    #features.append(np.mean(processed_images["image_HSV_H"]))
+    features.append(np.mean(processed_images["image_HSV_S"]))
+    #features.append(np.mean(processed_images["image_HSV_V"]))
 
     features = np.concatenate((features, contrast))
     
@@ -199,7 +221,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 8 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 13 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )

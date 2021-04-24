@@ -23,7 +23,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
 import pandas as pd
-
+import keras
+from sklearn.preprocessing import LabelBinarizer
+import tensorflow as tf
 def imageProcessing(image):
 
     """
@@ -266,22 +268,59 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
     scaler.fit(X_train)
     # Normalización del conjunto de entrenamiento, aplicando los estadísticos.
     X_train = scaler.transform(X_train)
-
+    """
     #kf = KFold(n_splits=1)
     # Definición y entrenamiento del modelo
     model = MLPClassifier(hidden_layer_sizes=(np.maximum(10,np.ceil(np.shape(X_train)[1]/2).astype('uint8')),
                                               np.maximum(5,np.ceil(np.shape(X_train)[1]/4).astype('uint8'))),
                           max_iter=205, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
                           learning_rate_init=0.1)
-    """
+
     for train_indices, val_indices in kf.split(X_train, y_train):
         model.fit(X_train[train_indices], y_train[train_indices])
-    """    
+
     model.fit(X_train, y_train)
     
-      
-    ### - - - - - - - - - - - - - - - - - - - - - - - - -
+    """
+    model = MLPClassifier(hidden_layer_sizes=(np.maximum(10,np.ceil(np.shape(X_train)[1]/2).astype('uint8')),
+                                              np.maximum(5,np.ceil(np.shape(X_train)[1]/4).astype('uint8'))),
+                                              max_iter=205, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
+                                              learning_rate_init=0.1)
+    
+    train_dir = os.path.join('..\data', 'train')
+    #validation_dir = os.path.join(base_dir, 'test')
 
+    # Directory with our training cat/dog pictures
+    train_brain_dir = os.path.join(train_dir, 'brain')
+    train_fern_dir = os.path.join(train_dir, 'fern')
+    train_grapes_dir = os.path.join(train_dir, 'grapes')
+    train_music_dir = os.path.join(train_dir, 'sheet-music')
+    
+    print('total training brain images :', len(os.listdir(      train_brain_dir ) ))
+    print('total training fern images :', len(os.listdir(      train_fern_dir ) ))
+    print('total training grapes images :', len(os.listdir(      train_grapes_dir ) ))
+    print('total training music images :', len(os.listdir(      train_music_dir ) ))
+    
+    from tensorflow.keras.optimizers import RMSprop
+
+
+
+    from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+    # Es siempre recomendable normalizar las imágenes (escalar)
+    train_datagen = ImageDataGenerator( rescale = 1.0/255. )
+    
+    # --------------------
+    # Usaremos un batch de 20 para entrenar
+    # --------------------
+    train_generator = train_datagen.flow_from_directory(train_dir,
+                                                        batch_size=20,
+                                                        target_size=(150, 150))
+    
+    ### - - - - - - - - - - - - - - - - - - - - - - - - -
+    print('fiiiiiiiiiiiit')
+    model.fit(train_generator, y_train)
+    print('acabao fit')
     return scaler, model
 
 def test_classifier(scaler, model, X_test):
