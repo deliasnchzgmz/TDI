@@ -76,8 +76,9 @@ def imageProcessing(image):
     
     
     # Añadimos el histograma de la imagen en escala de grises
-    
-    processed_images["image_histogram"] = np.histogram(processed_images["image_gray"], 256)
+   
+    processed_images["image_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_gray"]), 256))[0]
+    #processed_images["dep_histogram"] = (np.abs(processed_images["image_histogram"]))**2
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     return processed_images
@@ -140,11 +141,11 @@ def extractFeatures(processed_images):
     
     #Calculamos la transformada de fourier y diferentes caracteristicas
     fourier = np.fft.fft(processed_images["image_gray"])
-    dep = np.abs(fourier) ** 2 #Densidad espectral de potencia
+    #dep = np.abs(fourier) ** 2 #Densidad espectral de potencia
     fase = np.angle(fourier) #Angulo de fase
-    mediaDep = np.mean(dep)
-    mediaFase = np.mean(fase)
-    desviacionDep = np.std(dep)
+    #mediaDep = np.mean(dep)
+    #mediaFase = np.mean(fase)
+    #desviacionDep = np.std(dep)
     desviacionFase = np.std(fase)
     #features.append(mediaFase)
     #features.append(mediaDep)
@@ -155,11 +156,11 @@ def extractFeatures(processed_images):
     #features.append(np.mean(processed_images["image_lab_l"]))
     #features.append(np.mean(processed_images["image_lab_a"]))
     #features.append(np.mean(processed_images["image_lab_b"]))
-    """
-    desviacionHist = np.std(processed_images["image_histogram"])
-    features.append(desviacionHist)
+
+    #stdHist = np.std(processed_images["image_histogram"])
+    #features.append(stdHist)
     
-    """
+
     features = np.concatenate((features, contrast))
     
     return features
