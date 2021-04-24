@@ -167,7 +167,7 @@ def extractFeatures(processed_images):
     #desviacionDep = np.std(dep)
     desviacionFase = np.std(fase)
     #features.append(mediaFase)
-    features.append(mediaDep)
+    #features.append(mediaDep)
     #features.append(desviacionDep)
     features.append(desviacionFase)
     
@@ -221,7 +221,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 13 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
