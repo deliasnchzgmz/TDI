@@ -20,7 +20,7 @@ import numpy as np
 from skimage import io, color, feature, measure #,filters, etc,
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import KFold
 import pandas as pd
 
 def imageProcessing(image):
@@ -66,6 +66,18 @@ def imageProcessing(image):
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
     # Añadimos la mascara de la imagen como una entrada a la variable diccionario
     processed_images["image_binary"] = processed_images["image_sharpening"]
+    # Añadimos la image en LAB
+    image_lab = color.rgb2lab(color.gray2rgb(image))
+    
+    # Extraemos las componentes de la image_lab
+    processed_images["image_lab_l"] = image_lab[:,:,0]
+    processed_images["image_lab_a"] = image_lab[:,:,1]
+    processed_images["image_lab_b"] = image_lab[:,:,2]
+    
+    
+    # Añadimos el histograma de la imagen en escala de grises
+    
+    processed_images["image_histogram"] = np.histogram(processed_images["image_gray"], 256)
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     return processed_images
@@ -139,8 +151,15 @@ def extractFeatures(processed_images):
     #features.append(desviacionDep)
     features.append(desviacionFase)
     
+    ##solas no - con las tres sale 76.25
+    #features.append(np.mean(processed_images["image_lab_l"]))
+    #features.append(np.mean(processed_images["image_lab_a"]))
+    #features.append(np.mean(processed_images["image_lab_b"]))
+    """
+    desviacionHist = np.std(processed_images["image_histogram"])
+    features.append(desviacionHist)
     
-    
+    """
     features = np.concatenate((features, contrast))
     
     return features
@@ -245,7 +264,7 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
                           max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
                           learning_rate_init=0.1)
     model.fit(X_train, y_train)
-
+    
       
     ### - - - - - - - - - - - - - - - - - - - - - - - - -
 
