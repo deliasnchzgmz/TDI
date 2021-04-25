@@ -19,7 +19,7 @@ import numpy as np
 import colorsys
 from scipy.stats import entropy
 from skimage.transform import hough_line, hough_line_peaks, probabilistic_hough_line
-from skimage import io, color, feature, measure ,filters
+from skimage import io, color, feature, measure ,filters, exposure
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
@@ -59,7 +59,9 @@ def imageProcessing(image):
     processed_images["image_gray"] = color.rgb2gray(image)
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
-        # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
+    #contraste de imagen con igualacion de histograma
+    processed_images["image_contrast"] = exposure.equalize_hist(processed_images["image_gray"])
+    # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
     processed_images["image_gray_filtered"] = filters.gaussian(processed_images["image_gray"], sigma=1)
     # imagen bordes gauss
     processed_images["images_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1)
@@ -67,13 +69,15 @@ def imageProcessing(image):
     kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
     #Añadimos una imagen de bordes con canny a partid de image sharpening
-    processed_images["image_bordes"] = feature.canny(processed_images["image_sharpening"], sigma=1)
+    processed_images["image_bordes"] = (feature.canny(processed_images["image_sharpening"], sigma=3)).astype(int)
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
     # Añadimos la mascara de la imagen como una entrada a la variable diccionario
     processed_images["image_binary"] = processed_images["image_sharpening"]
     # Añadimos la image en LAB
     #image_lab = color.rgb2lab(color.gray2rgb(image))
+    
+    
     
     # Extraemos las componentes de la image_lab
     #processed_images["image_lab_l"] = image_lab[:,:,0]
@@ -184,27 +188,19 @@ def extractFeatures(processed_images):
     gausscanny = np.sum(processed_images["images_bordes_gauss"]==1)
     #features.append(gausscanny)
     
-    features.append(np.mean(processed_images["image_RGB_R"]))
-    features.append(np.mean(processed_images["image_RGB_G"]))
-    features.append(np.mean(processed_images["image_RGB_B"]))
+    features.append(np.mean(np.abs(processed_images["image_RGB_R"])))
+    features.append(np.mean(np.abs(processed_images["image_RGB_G"])))
+    features.append(np.mean(np.abs(processed_images["image_RGB_B"])))
 
     #features.append(np.mean(processed_images["image_HSV_H"]))
     features.append(np.mean(processed_images["image_HSV_S"]))
     #features.append(np.mean(processed_images["image_HSV_V"]))
     
-    #hist_img256, _ = np.histogram(processed_images["image_gray"], 256)
+    #hist_img256, _ = np.histogram(processed_images["image_gray_256"])
     #norm_hist = hist_img256/np.sum(hist_img256)
     #ent = entropy(norm_hist)
     #features.append(ent)
     
-    # Utilizamos la función skimage.measure.regionprops para obtener
-    # descriptores de región de la imagen. Recibe como entrada la máscara
-    # binaria de la imagen.
-    props = measure.regionprops(processed_images["image_binary"].astype(int))[0]
-     
-    # 6. rel_area_perimeter: Relacion area/perimetro de la region del pez
-    area_per = props.area/props.perimeter
-    features.append(area_per)
 
     features = np.concatenate((features, contrast))
     
@@ -236,7 +232,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 13 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
