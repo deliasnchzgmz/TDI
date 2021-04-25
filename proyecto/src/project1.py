@@ -192,10 +192,19 @@ def extractFeatures(processed_images):
     features.append(np.mean(processed_images["image_HSV_S"]))
     #features.append(np.mean(processed_images["image_HSV_V"]))
     
-    hist_img256, _ = np.histogram(processed_images["image_gray_256"])
-    norm_hist = hist_img256/np.sum(hist_img256)
-    ent = entropy(norm_hist)
-    features.append(ent)
+    #hist_img256, _ = np.histogram(processed_images["image_gray"], 256)
+    #norm_hist = hist_img256/np.sum(hist_img256)
+    #ent = entropy(norm_hist)
+    #features.append(ent)
+    
+    # Utilizamos la función skimage.measure.regionprops para obtener
+    # descriptores de región de la imagen. Recibe como entrada la máscara
+    # binaria de la imagen.
+    props = measure.regionprops(processed_images["image_binary"].astype(int))[0]
+     
+    # 6. rel_area_perimeter: Relacion area/perimetro de la region del pez
+    area_per = props.area/props.perimeter
+    features.append(area_per)
 
     features = np.concatenate((features, contrast))
     
