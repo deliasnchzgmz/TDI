@@ -64,7 +64,7 @@ def imageProcessing(image):
     # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
     processed_images["image_gray_filtered"] = filters.gaussian(processed_images["image_gray"], sigma=1)
     # imagen bordes gauss
-    processed_images["images_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1)
+    processed_images["image_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1)
     #Añadimos la imagen tras aplicar un filtrado de sharpening
     kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
@@ -184,10 +184,8 @@ def extractFeatures(processed_images):
 
     #stdHist = np.std(processed_images["image_histogram"])
     #features.append(stdHist)
-
-    #filtro de gauss y bordes
-    gausscanny = np.sum(processed_images["images_bordes_gauss"]==1)
-    #features.append(gausscanny)
+    
+    
 
     features.append(np.mean(np.abs(processed_images["image_RGB_R"])))
     features.append(np.mean(np.abs(processed_images["image_RGB_G"])))
@@ -202,8 +200,7 @@ def extractFeatures(processed_images):
     #ent = entropy(norm_hist)
     #features.append(ent)
 
-<<<<<<< HEAD
-=======
+
     # Utilizamos la función skimage.measure.regionprops para obtener
     # descriptores de región de la imagen. Recibe como entrada la máscara
     # binaria de la imagen.
@@ -212,7 +209,6 @@ def extractFeatures(processed_images):
     # 6. rel_area_perimeter: Relacion area/perimetro de la region del pez
     #area_per = props.area/props.perimeter
     #features.append(area_per)
->>>>>>> 794827ad0d3a0d05e60d74c089720d32de61d1e0
 
     features = np.concatenate((features, contrast))
 
