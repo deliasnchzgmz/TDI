@@ -17,7 +17,7 @@ import skimage
 import natsort
 import numpy as np
 import colorsys
-#from skimage.filters.rank import entropy
+from scipy.stats import entropy
 from skimage.transform import hough_line, hough_line_peaks, probabilistic_hough_line
 from skimage import io, color, feature, measure ,filters
 from sklearn.preprocessing import StandardScaler
@@ -59,6 +59,10 @@ def imageProcessing(image):
     processed_images["image_gray"] = color.rgb2gray(image)
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
+        # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
+    processed_images["image_gray_filtered"] = filters.gaussian(processed_images["image_gray"], sigma=1)
+    # imagen bordes gauss
+    processed_images["images_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1)
     #Añadimos la imagen tras aplicar un filtrado de sharpening
     kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
@@ -90,10 +94,8 @@ def imageProcessing(image):
     processed_images["image_HSV_S"] = image_HSV[:,:,1]
     #processed_images["image_HSV_V"] = image_HSV[:,:,2]
     
-    # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
-    processed_images["image_gray_filtered"] = filters.gaussian(processed_images["image_gray"], sigma=2)
-    # imagen bordes gauss
-    processed_images["images_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1)
+
+
     # Añadimos el histograma de la imagen en escala de grises
     processed_images["image_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_gray"]), 256))[0]
     #processed_images["dep_histogram"] = (np.abs(processed_images["image_histogram"]))**2
@@ -131,7 +133,6 @@ def extractFeatures(processed_images):
     # baseline, su desviación típica (descriptor muy simple de textura).
     image_gray = processed_images["image_gray"]
     std_gray = np.std(image_gray)
-    #features.append(image_gray)
     features.append(std_gray)
 
 
@@ -160,9 +161,9 @@ def extractFeatures(processed_images):
     
     #Calculamos la transformada de fourier y diferentes caracteristicas
     fourier = np.fft.fft(processed_images["image_gray"])
-    dep = np.abs(fourier) ** 2 #Densidad espectral de potencia
+    #dep = np.abs(fourier) ** 2 #Densidad espectral de potencia
     fase = np.angle(fourier) #Angulo de fase
-    mediaDep = np.mean(dep)
+    #mediaDep = np.mean(dep)
     #mediaFase = np.mean(fase)
     #desviacionDep = np.std(dep)
     desviacionFase = np.std(fase)
@@ -190,6 +191,11 @@ def extractFeatures(processed_images):
     #features.append(np.mean(processed_images["image_HSV_H"]))
     features.append(np.mean(processed_images["image_HSV_S"]))
     #features.append(np.mean(processed_images["image_HSV_V"]))
+    
+    hist_img256, _ = np.histogram(processed_images["image_gray_256"])
+    norm_hist = hist_img256/np.sum(hist_img256)
+    ent = entropy(norm_hist)
+    features.append(ent)
 
     features = np.concatenate((features, contrast))
     
@@ -221,7 +227,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 13 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
@@ -293,8 +299,8 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
     # Definición y entrenamiento del modelo
     model = MLPClassifier(hidden_layer_sizes=(np.maximum(10,np.ceil(np.shape(X_train)[1]/2).astype('uint8')),
                                               np.maximum(5,np.ceil(np.shape(X_train)[1]/4).astype('uint8'))),
-                          max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
-                          learning_rate_init=0.1)
+                                              max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
+                                              learning_rate_init=0.1)
     """
     for train_indices, val_indices in kf.split(X_train, y_train):
         model.fit(X_train[train_indices], y_train[train_indices])
