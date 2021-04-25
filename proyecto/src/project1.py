@@ -68,10 +68,9 @@ def imageProcessing(image):
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
     #Añadimos una imagen de bordes con canny a partid de image sharpening
     processed_images["image_bordes"] = feature.canny(processed_images["image_sharpening"], sigma=1)
-    # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
-    processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
     # Añadimos la mascara de la imagen como una entrada a la variable diccionario
     processed_images["image_binary"] = processed_images["image_sharpening"]
+    
     # Añadimos la image en LAB
     #image_lab = color.rgb2lab(color.gray2rgb(image))
     
@@ -200,11 +199,11 @@ def extractFeatures(processed_images):
     # Utilizamos la función skimage.measure.regionprops para obtener
     # descriptores de región de la imagen. Recibe como entrada la máscara
     # binaria de la imagen.
-    props = measure.regionprops(processed_images["image_binary"].astype(int))[0]
+    #props = measure.regionprops(processed_images["image_binary"].astype(int))
      
     # 6. rel_area_perimeter: Relacion area/perimetro de la region del pez
-    area_per = props.area/props.perimeter
-    features.append(area_per)
+    #area_per = props.area/props.perimeter
+    #features.append(area_per)
 
     features = np.concatenate((features, contrast))
     
@@ -236,7 +235,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 13 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
