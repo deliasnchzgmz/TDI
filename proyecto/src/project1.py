@@ -55,30 +55,37 @@ def imageProcessing(image):
     processed_images = {}
     # Ejemplo: Añadimos la imagen original como una entrada a la variable diccionario
     processed_images["image"] = image
+    
     # Añadimos la imagen en escala de grises como una entrada a la variable diccionario
     processed_images["image_gray"] = color.rgb2gray(image)
+    
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
+    
     #contraste de imagen con igualacion de histograma
     processed_images["image_contrast"] = exposure.equalize_hist(processed_images["image_gray"])
+    
     # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
     processed_images["image_gray_filtered"] = filters.gaussian(processed_images["image_gray"], sigma=1)
+    
     # imagen bordes gauss
-    processed_images["image_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1)
+    processed_images["image_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1.5)
+    
     #Añadimos la imagen tras aplicar un filtrado de sharpening
     kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
-    #Añadimos una imagen de bordes con canny a partid de image sharpening
+    
+    #Añadimos una imagen de bordes con canny a partir de image sharpening
     processed_images["image_bordes"] = (feature.canny(processed_images["image_sharpening"], sigma=3)).astype(int)
+    
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
+    
     # Añadimos la mascara de la imagen como una entrada a la variable diccionario
     processed_images["image_binary"] = processed_images["image_sharpening"]
 
     # Añadimos la image en LAB
     #image_lab = color.rgb2lab(color.gray2rgb(image))
-
-
 
     # Extraemos las componentes de la image_lab
     #processed_images["image_lab_l"] = image_lab[:,:,0]
@@ -99,11 +106,15 @@ def imageProcessing(image):
     processed_images["image_HSV_S"] = image_HSV[:,:,1]
     #processed_images["image_HSV_V"] = image_HSV[:,:,2]
 
-
-
     # Añadimos el histograma de la imagen en escala de grises
     processed_images["image_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_gray"]), 256))[0]
     #processed_images["dep_histogram"] = (np.abs(processed_images["image_histogram"]))**2
+    
+    #Añado para detectar lineas con la transformada de Hough
+    processed_images["hough_lines"] = cv2.HoughLinesP((processed_images["image_bordes_gauss"]).astype(np.uint8),1,
+                                                        theta=np.pi/180, threshold=20, minLineLength=50, maxLineGap=4)
+    
+    
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     return processed_images
@@ -209,6 +220,11 @@ def extractFeatures(processed_images):
     # 6. rel_area_perimeter: Relacion area/perimetro de la region del pez
     #area_per = props.area/props.perimeter
     #features.append(area_per)
+    
+    fourier_lines = np.fft.fft(processed_images["hough_lines"])
+    dep_lines = np.abs(fourier) ** 2 #Densidad espectral de potencia
+    fase_lines = np.angle(fourier) #Angulo de fase
+    
 
     features = np.concatenate((features, contrast))
 
@@ -240,7 +256,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 13 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
