@@ -11,15 +11,16 @@
 %                                                                       %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 """
-import os
+import os, math
 import cv2
 import skimage
+
 import natsort
 import numpy as np
 import colorsys
 from scipy.stats import entropy
 from skimage.transform import hough_line, hough_line_peaks, probabilistic_hough_line
-from skimage import io, color, feature, measure ,filters
+from skimage import io, color, feature, measure ,filters, exposure
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
@@ -55,53 +56,109 @@ def imageProcessing(image):
     processed_images = {}
     # Ejemplo: Añadimos la imagen original como una entrada a la variable diccionario
     processed_images["image"] = image
+    
     # Añadimos la imagen en escala de grises como una entrada a la variable diccionario
     processed_images["image_gray"] = color.rgb2gray(image)
+    
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
-        # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
+    
+    #contraste de imagen con igualacion de histograma
+    processed_images["image_contrast"] = exposure.equalize_hist(processed_images["image_gray"])
+    
+    # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
     processed_images["image_gray_filtered"] = filters.gaussian(processed_images["image_gray"], sigma=1)
+    
     # imagen bordes gauss
-    processed_images["images_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1)
+    processed_images["image_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1.5)
+    
     #Añadimos la imagen tras aplicar un filtrado de sharpening
     kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
-    #Añadimos una imagen de bordes con canny a partid de image sharpening
-    processed_images["image_bordes"] = feature.canny(processed_images["image_sharpening"], sigma=1)
+    
+    #Añadimos una imagen de bordes con canny a partir de image sharpening
+    processed_images["image_bordes"] = (feature.canny(processed_images["image_sharpening"], sigma=3)).astype(int)
+    
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
+    
     # Añadimos la mascara de la imagen como una entrada a la variable diccionario
     processed_images["image_binary"] = processed_images["image_sharpening"]
+
     # Añadimos la image en LAB
     #image_lab = color.rgb2lab(color.gray2rgb(image))
-    
+
     # Extraemos las componentes de la image_lab
     #processed_images["image_lab_l"] = image_lab[:,:,0]
     #processed_images["image_lab_a"] = image_lab[:,:,1]
     #processed_images["image_lab_b"] = image_lab[:,:,2]
-    
+
     # Extraemos las componentes de la image_RGB
     image_RGB = image
     if len(image.shape)==2:
         image_RGB = color.gray2rgb(image)
     processed_images["image_RGB_R"] = image_RGB[:,:,0]
     processed_images["image_RGB_G"] = image_RGB[:,:,1]
-    processed_images["image_RGB_B"] = image_RGB[:,:,2]   
-    
+    processed_images["image_RGB_B"] = image_RGB[:,:,2]
+
     # Extraemos las componentes de la image_lab
     image_HSV = color.rgb2hsv(color.gray2rgb(image))
     #processed_images["image_HSV_H"] = image_HSV[:,:,0]
     processed_images["image_HSV_S"] = image_HSV[:,:,1]
     #processed_images["image_HSV_V"] = image_HSV[:,:,2]
-    
-
 
     # Añadimos el histograma de la imagen en escala de grises
     processed_images["image_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_gray"]), 256))[0]
     #processed_images["dep_histogram"] = (np.abs(processed_images["image_histogram"]))**2
+    
+    #Añado para detectar lineas con la transformada de Hough
+    
+    
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     return processed_images
+
+
+def linesImage(processed_images):
+    """
+    Parameters
+    ----------
+    processed_images : metemos las imágenes procesadas para usarlas para sacar las imágenes de líneas por T Hough
+
+    Returns la imagen de líneas correspondiente
+    -------
+    None.
+    """
+ 
+    count = 0
+    stdSlope = 0
+    
+    theta = np.pi/180 #resolucion angular en radianes de la cuadricula de hough
+    threshold = 50 #minimo num de cortes en la cuadricula
+    min_line_length=40
+    max_line_gap = 10
+    
+    lines = cv2.HoughLinesP(processed_images["image_bordes"].astype(np.uint8),1,theta,threshold,minLineLength=min_line_length,maxLineGap=max_line_gap)
+    if lines is not None:
+       for line in lines:
+        count = count+1
+        for x1,y1,x2,y2 in line:
+            cv2.line(processed_images["image"]*0,(x1,y1), (x2,y2), (255,0,0),1)     
+       X1 = lines[:,0,0]
+       X2 = lines[:,0,1]
+       Y1 = lines[:,0,2]
+       Y2 = lines[:,0,3]            
+       slope = (Y2-Y1)/(X2-X1)
+       stdSlope = np.std(slope)
+       meanLength = np.mean(((X2-X1)**2+(Y2-Y1)**2)**0.5)
+       
+    if lines is None:
+        count = 0
+        stdSlope = 1000
+        meanLength = 1000
+        
+    return stdSlope, meanLength, count
+
 
 def extractFeatures(processed_images):
 
@@ -139,26 +196,26 @@ def extractFeatures(processed_images):
     canny = np.sum(processed_images["image_bordes"]==1)
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     features.append(canny)
-    
+
     distances = [4] #Distancia entre los pares de pixeles que iremos acumulando la matriz de co-ocurrencias
-  
+
     angles = [0, np.pi/4, np.pi/2, 3*np.pi/4] #Array con los diferentes ángulos (en radianes) que nos indican la orientación a la hora de considerar un píxel vecino
-  
+
     properties = ['contrast'] #El contraste sera la propiedad que hallemos a partir de la matriz de co-ocurrencias
-  
+
     #Calculamos la matriz de co-ocurrencias normalizada a partir de los parametros anteriormente descritos
     glcm = feature.texture.greycomatrix(processed_images["image_gray_256"], distances=distances, angles=angles, levels=256, symmetric=True, normed=True)
-  
+
     #Calculamos el contraste para las cuatro combinaciones de pares de pixeles según su ángulo
     #Acumulamos en un array los 4 valores que pasaremos como caracteristicas al clasificador
-    contrast = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties]) 
-    
+    contrast = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties])
+
     #Contamos el numero de objetos que hay en la imagen con regionprops()
     label_img = measure.label(processed_images["image_binary"])
     regions = measure.regionprops(label_img)
     nregions = len(regions)
     features.append(nregions)
-    
+
     #Calculamos la transformada de fourier y diferentes caracteristicas
     fourier = np.fft.fft(processed_images["image_gray"])
     #dep = np.abs(fourier) ** 2 #Densidad espectral de potencia
@@ -171,7 +228,7 @@ def extractFeatures(processed_images):
     #features.append(mediaDep)
     #features.append(desviacionDep)
     features.append(desviacionFase)
-    
+
     ##solas no - con las tres sale 76.25
     #features.append(np.mean(processed_images["image_lab_l"]))
     #features.append(np.mean(processed_images["image_lab_a"]))
@@ -180,10 +237,8 @@ def extractFeatures(processed_images):
     #stdHist = np.std(processed_images["image_histogram"])
     #features.append(stdHist)
     
-    #filtro de gauss y bordes
-    gausscanny = np.sum(processed_images["images_bordes_gauss"]==1)
-    #features.append(gausscanny)
     
+
     features.append(np.mean(np.abs(processed_images["image_RGB_R"])))
     features.append(np.mean(np.abs(processed_images["image_RGB_G"])))
     features.append(np.mean(np.abs(processed_images["image_RGB_B"])))
@@ -191,14 +246,29 @@ def extractFeatures(processed_images):
     #features.append(np.mean(processed_images["image_HSV_H"]))
     features.append(np.mean(processed_images["image_HSV_S"]))
     #features.append(np.mean(processed_images["image_HSV_V"]))
-    
+
     #hist_img256, _ = np.histogram(processed_images["image_gray_256"])
     #norm_hist = hist_img256/np.sum(hist_img256)
     #ent = entropy(norm_hist)
     #features.append(ent)
 
-    features = np.concatenate((features, contrast))
+
+    # Utilizamos la función skimage.measure.regionprops para obtener
+    # descriptores de región de la imagen. Recibe como entrada la máscara
+    # binaria de la imagen.
+    #props = measure.regionprops(processed_images["image_binary"].astype(int))
+
+    # 6. rel_area_perimeter: Relacion area/perimetro de la region del pez
+    #area_per = props.area/props.perimeter
+    #features.append(area_per)
     
+    #stdSlope, meanLength, count = linesImage(processed_images)
+    #features.append(stdSlope)
+    #features.append(meanLength)
+    #features.append(count)
+
+    features = np.concatenate((features, contrast))
+
     return features
 
 def databaseFeatures(db="../data/train"):
@@ -227,7 +297,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 13 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
@@ -304,10 +374,10 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
     """
     for train_indices, val_indices in kf.split(X_train, y_train):
         model.fit(X_train[train_indices], y_train[train_indices])
-    """    
+    """
     model.fit(X_train, y_train)
-    
-      
+
+
     ### - - - - - - - - - - - - - - - - - - - - - - - - -
 
     return scaler, model

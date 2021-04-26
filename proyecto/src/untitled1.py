@@ -19,7 +19,7 @@ import pandas as pd
 import math
 import matplotlib.pyplot as plt
 
-image = cv2.imread('../data/test/unknown/3.jpg')
+image = cv2.imread('../data/test/unknown/73.jpg')
 plt.imshow(image, 'gray')
 imagegray = color.rgb2gray(image)
 kernel = np.array([[1,1,1],[1,4,1], [1,1,1]])
@@ -27,75 +27,46 @@ img_sharp = cv2.filter2D(image, -1, kernel)
 imggauss = cv2.GaussianBlur(imagegray, (5,5), 0)
 img_256 = skimage.img_as_ubyte(image)
 
-
+#5
 rho =1 #pixeles de distancia
 theta = np.pi/180 #resolucion angular en radianes de la cuadricula de hough
-threshold = 90 #minimo num de cortes en la cuadricula
-min_line_length=50
-max_line_gap = 4
+threshold = 50 #minimo num de cortes en la cuadricula
+min_line_length=40
+max_line_gap = 10
 line_image = np.copy(image)*0
 
-'''
-lower_white = np.array([0,0,255])
-upper_white = np.array([255,255,255])
-# Create the mask
-mask = cv2.inRange(image, lower_white, upper_white)
- 
-# Create the inverted mask
-mask_inv = cv2.bitwise_not(mask)
+line_image = np.copy(image)*0
 
-plt.imshow(mask_inv, 'gray')
-'''
+
+edges = np.uint8(np.array(image.shape))
+edges = (feature.canny(imagegray, sigma=2)).astype(np.uint8)
+
+plt.imshow(edges, 'gray')
+count = 0
 
 edges = np.uint8(np.array(image.shape))
 edges = (feature.canny(imagegray, sigma=1.5)).astype(np.uint8)
-
 plt.imshow(edges, 'gray')
-
-lines = cv2.HoughLines(edges,1,theta,threshold, None, 0, 0)
-
-if lines is not None:
-        for i in range(0, len(lines)):
-            rho = lines[i][0][0]
-            theta = lines[i][0][1]
-            a = math.cos(theta)
-            b = math.sin(theta)
-            x0 = a * rho
-            y0 = b * rho
-            pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000*(a)))
-            pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
-            cv2.line(line_image, pt1, pt2, (0,0,255), 3, cv2.LINE_AA)
-        
-
-plt.imshow(line_image, 'gray')
-std = np.std(lines)
-"""
 lines = cv2.HoughLinesP(edges,1,theta,threshold,minLineLength=min_line_length,maxLineGap=max_line_gap)
-
 if lines is not None:
-    for i in range(0,len(lines)):
-        rho = lines[i][0][0]
-        theta = lines[i][0][1]
+   for line in lines:
+    count = count+1
+    for x1,y1,x2,y2 in line:
+        cv2.line(image,(x1,y1), (x2,y2), (255,0,0),1)
         
-        a = np.cos(theta)
-        b = np.sin(theta)
-        x0 = a*rho
-        y0 = b*rho
-        x1 = int(x0 + 1000*(-b))
-        y1 = int(y0 + 1000*(a))
-        x2 = int(x0 - 1000*(-b))
-        y2 = int(y0 - 1000*(a))
-        cv2.line(image,(x1,y1),(x2,y2), (0,0,255),2)
         
-plt.imshow(image)
-"""
-'''
-plt.imshow(imggauss)
+X1 = lines[:,0,0]
+X2 = lines[:,0,1]
+Y1 = lines[:,0,2]
+Y2 = lines[:,0,3]
 
-imgcanny = feature.canny(imggauss,1)
+a = (X2-X1)
+b = (Y2-Y1)
+c = np.mean(((X2-X1)**2+(Y2-Y1)**2)**0.5)
 
-plt.imshow(imgcanny, 'gray')
-'''
+
+#plt.imshow(image, 'gray')
+
 
 
 
