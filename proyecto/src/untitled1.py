@@ -19,14 +19,19 @@ import pandas as pd
 import math
 import matplotlib.pyplot as plt
 
-image = cv2.imread('../data/test/unknown/73.jpg')
+image = cv2.imread('../data/test/unknown/58.jpg')
 plt.imshow(image, 'gray')
 imagegray = color.rgb2gray(image)
-kernel = np.array([[1,1,1],[1,4,1], [1,1,1]])
-img_sharp = cv2.filter2D(image, -1, kernel)
 imggauss = cv2.GaussianBlur(imagegray, (5,5), 0)
+kernel = np.array([[-1/9,-1/9,-1/9],[-1/9,5,-1/9], [-1/9,-1/9,-1/9]])
+img_sharp = cv2.filter2D(imagegray, -1, kernel)
 img_256 = skimage.img_as_ubyte(image)
 
+plt.subplot(1,2,1)
+plt.imshow(imagegray, 'gray')
+plt.subplot(1,2,2)
+plt.imshow(img_sharp, 'gray')
+'''
 #5
 rho =1 #pixeles de distancia
 theta = np.pi/180 #resolucion angular en radianes de la cuadricula de hough
@@ -67,7 +72,10 @@ c = np.mean(((X2-X1)**2+(Y2-Y1)**2)**0.5)
 
 #plt.imshow(image, 'gray')
 
-
+'''
+'''
+resize para matriz de coocurrencias
+'''
 
 
 
