@@ -134,7 +134,7 @@ def linesImage(processed_images):
     count = 0
     stdSlope = 0
     
-    theta = np.pi/180 #resolucion angular en radianes de la cuadricula de hough
+    theta = np.pi/10 #resolucion angular en radianes de la cuadricula de hough
     threshold = 50 #minimo num de cortes en la cuadricula
     min_line_length=40
     max_line_gap = 10
@@ -268,7 +268,7 @@ def extractFeatures(processed_images):
     #features.append(meanLength)
     #features.append(count)
     
-    features.append(processed_images["image_lbp"])
+    #features.append(processed_images["image_lbp"])
 
     features = np.concatenate((features, contrast))
 
@@ -300,7 +300,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 13 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
@@ -372,12 +372,13 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
     # Definición y entrenamiento del modelo
     model = MLPClassifier(hidden_layer_sizes=(np.maximum(10,np.ceil(np.shape(X_train)[1]/2).astype('uint8')),
                                               np.maximum(5,np.ceil(np.shape(X_train)[1]/4).astype('uint8'))),
-                                              max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
+                                               max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
                                               learning_rate_init=0.1)
     """
     for train_indices, val_indices in kf.split(X_train, y_train):
         model.fit(X_train[train_indices], y_train[train_indices])
     """
+
     model.fit(X_train, y_train)
 
 

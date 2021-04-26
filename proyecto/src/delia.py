@@ -11,20 +11,19 @@
 %                                                                       %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 """
-import os, math
-import cv2
-import skimage
-
-import natsort
+import os, math, cv2, skimage, natsort, keras
 import numpy as np
-import colorsys
+import pandas as pd
+import tensorflow as tf
 from scipy.stats import entropy
 from skimage.transform import hough_line, hough_line_peaks, probabilistic_hough_line
 from skimage import io, color, feature, measure ,filters, exposure
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
-import pandas as pd
+from tensorflow.keras.optimizers import RMSprop
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
 
 def imageProcessing(image):
 
@@ -55,7 +54,7 @@ def imageProcessing(image):
 
     processed_images = {}
     # Ejemplo: Añadimos la imagen original como una entrada a la variable diccionario
-    processed_images["image"] = image
+    processed_images["image"] = cv2.resize(image, (300,300))
     
     # Añadimos la imagen en escala de grises como una entrada a la variable diccionario
     processed_images["image_gray"] = color.rgb2gray(image)
@@ -111,7 +110,8 @@ def imageProcessing(image):
     processed_images["image_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_gray"]), 256))[0]
     #processed_images["dep_histogram"] = (np.abs(processed_images["image_histogram"]))**2
     
-    #Añado para detectar lineas con la transformada de Hough
+    # Añadimos la imagen lbp como una entrada a la variable diccionario
+    processed_images["image_lbp"] = feature.texture.local_binary_pattern(processed_images["image_gray_filtered"], 8*3, 3)
     
     
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -155,7 +155,7 @@ def linesImage(processed_images):
     if lines is None:
         count = 0
         stdSlope = 1000
-        meanLength = 1000
+        meanLength = 0
         
     return stdSlope, meanLength, count
 
@@ -297,7 +297,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 13 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
@@ -352,7 +352,7 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
     del conjunto de imágenes de entrenamiento, 'model'.
 
     """
-
+    """
     # El siguiente código implementa el clasificador utilizado para el BASELINE
     # incluido en el challenge de Kaggle.
     # - - - NO ES NECESARIO MODIFICAR EL CLASIFICADOR PERO,
@@ -371,15 +371,59 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
                                               np.maximum(5,np.ceil(np.shape(X_train)[1]/4).astype('uint8'))),
                                               max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
                                               learning_rate_init=0.1)
-    """
+    
     for train_indices, val_indices in kf.split(X_train, y_train):
         model.fit(X_train[train_indices], y_train[train_indices])
-    """
+    
     model.fit(X_train, y_train)
 
+    """
+    train_brain_dir = os.path.join('../data/train', 'brain')
+    train_fern_dir = os.path.join('../data/train', 'fern')
+    train_grapes_dir = os.path.join('../data/train', 'grapes')
+    train_music_dir = os.path.join('../data/train', 'sheet-music')
+    
+    val_brain_dir = os.path.join('../data/train', 'brain')
+    val_fern_dir = os.path.join('../data/train', 'fern')
+    val_grapes_dir = os.path.join('../data/train', 'grapes')
+    val_music_dir = os.path.join('../data/train', 'sheet-music')
+    
+    X_val.append(val_brain_dir)
+    X_val.append(val_fern_dir)
+    X_val.append(val_grapes_dir)
+    X_val.append(val_music_dir)
 
+    
+    scaler = StandardScaler() ##normalización (lo dejo)
+    scaler.fit(X_train)
+    
+    model = tf.keras.models.Sequential([
+        # el input es de 150x150 en RGB
+        tf.keras.layers.Conv2D(16, (3,3), activation='relu', input_shape=(150, 150, 3)),
+        tf.keras.layers.MaxPooling2D(2,2),
+        tf.keras.layers.Conv2D(32, (3,3), activation='relu'),
+        tf.keras.layers.MaxPooling2D(2,2), 
+        tf.keras.layers.Conv2D(64, (3,3), activation='relu'), 
+        tf.keras.layers.MaxPooling2D(4,4),
+        # Siempre terminamos una "flatten"
+        tf.keras.layers.Flatten(),
+        # 512 neurones en una capa densa "hidden"
+        tf.keras.layers.Dense(512, activation='relu'), 
+        # El output es una sola neurona. 1 para la clase ('cats') y cero para la clase ('dogs')
+        tf.keras.layers.Dense(4, activation='softmax')  
+    ])
+    model.compile(optimizer=RMSprop(lr=0.001),
+              loss='binary_crossentropy',
+              metrics = ['accuracy'])
     ### - - - - - - - - - - - - - - - - - - - - - - - - -
-
+    train_datagen = ImageDataGenerator(rescale=1.0/255)
+    train_generator = train_datagen.flow_from_directory(('../data/train'), batch_size=20,target_size=(150,150))
+    
+    model.fit(train_generator,
+                    steps_per_epoch=100,
+                    epochs=15,
+                    validation_steps=50,
+                    verbose=2)
     return scaler, model
 
 def test_classifier(scaler, model, X_test):
