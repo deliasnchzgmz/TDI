@@ -25,6 +25,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
 import pandas as pd
+import matplotlib.pyplot as plt
+
 
 def imageProcessing(image):
 
@@ -73,18 +75,13 @@ def imageProcessing(image):
     processed_images["image_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1.5)
     
     #Añadimos la imagen tras aplicar un filtrado de sharpening
+    kernel_bien_hecho = np.array([[-1/9,-1/9,-1/9],[-1/9,(10-1/9),-1/9], [-1/9,-1/9,-1/9]])
     kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
     
     #Añadimos una imagen de bordes con canny a partir de image sharpening
     processed_images["image_bordes"] = (feature.canny(processed_images["image_sharpening"], sigma=3)).astype(int)
     
-    # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
-    processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
-    
-    # Añadimos la mascara de la imagen como una entrada a la variable diccionario
-    processed_images["image_binary"] = processed_images["image_sharpening"]
-
     # Añadimos la image en LAB
     #image_lab = color.rgb2lab(color.gray2rgb(image))
 
@@ -113,7 +110,6 @@ def imageProcessing(image):
     
     # Añadimos la imagen lbp como una entrada a la variable diccionario
     processed_images["image_lbp"] = feature.texture.local_binary_pattern(processed_images["image_gray_filtered"], 8*3, 3)
-    
     
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -212,7 +208,7 @@ def extractFeatures(processed_images):
     contrast = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties])
 
     #Contamos el numero de objetos que hay en la imagen con regionprops()
-    label_img = measure.label(processed_images["image_binary"])
+    label_img = measure.label(processed_images["image_sharpening"])
     regions = measure.regionprops(label_img)
     nregions = len(regions)
     features.append(nregions)
@@ -252,7 +248,7 @@ def extractFeatures(processed_images):
     #norm_hist = hist_img256/np.sum(hist_img256)
     #ent = entropy(norm_hist)
     #features.append(ent)
-
+    
 
     # Utilizamos la función skimage.measure.regionprops para obtener
     # descriptores de región de la imagen. Recibe como entrada la máscara
@@ -269,7 +265,7 @@ def extractFeatures(processed_images):
     #features.append(count)
     
     #features.append(processed_images["image_lbp"])
-
+    
     features = np.concatenate((features, contrast))
 
     return features

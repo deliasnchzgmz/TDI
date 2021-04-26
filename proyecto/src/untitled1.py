@@ -19,47 +19,50 @@ import pandas as pd
 import math
 import matplotlib.pyplot as plt
 
-image = cv2.imread('../data/test/unknown/58.jpg')
-plt.imshow(image, 'gray')
+image = cv2.imread('../data/test/unknown/68.jpg')
+#plt.imshow(image, 'gray')
 imagegray = color.rgb2gray(image)
-imggauss = cv2.GaussianBlur(imagegray, (5,5), 0)
-kernel = np.array([[-1/9,-1/9,-1/9],[-1/9,(5-1/9),-1/9], [-1/9,-1/9,-1/9]])
+kernel = np.array([[-1/9,-1/9,-1/9],[-1/9,(10-1/9),-1/9], [-1/9,-1/9,-1/9]])
 img_sharp = cv2.filter2D(imagegray, -1, kernel)
+imggauss = cv2.GaussianBlur(img_sharp, (5,5), 0)
 img_256 = skimage.img_as_ubyte(image)
+edges = np.uint8(np.array(image.shape))
+edges = (feature.canny(imagegray, sigma=2)).astype(np.uint8)
+img_canny = feature.canny(img_sharp, sigma=1.5)
+
+# dsize
+dsize = (200, 200)
+resize = cv2.resize(image, dsize )
+
 
 plt.subplot(1,2,1)
-plt.imshow(imagegray, 'gray')
+plt.imshow(image)
 plt.subplot(1,2,2)
-plt.imshow(img_sharp, 'gray')
+plt.imshow(resize)
+
 '''
 #5
 rho =1 #pixeles de distancia
 theta = np.pi/180 #resolucion angular en radianes de la cuadricula de hough
 threshold = 50 #minimo num de cortes en la cuadricula
-min_line_length=40
+min_line_length=100
 max_line_gap = 10
 line_image = np.copy(image)*0
 
-line_image = np.copy(image)*0
 
+#pt.imshow(edges, 'gray')
 
-edges = np.uint8(np.array(image.shape))
-edges = (feature.canny(imagegray, sigma=2)).astype(np.uint8)
-
-plt.imshow(edges, 'gray')
-count = 0
-
-edges = np.uint8(np.array(image.shape))
-edges = (feature.canny(imagegray, sigma=1.5)).astype(np.uint8)
+edges = feature.canny(img_sharp, sigma=1.5)
 plt.imshow(edges, 'gray')
 lines = cv2.HoughLinesP(edges,1,theta,threshold,minLineLength=min_line_length,maxLineGap=max_line_gap)
 if lines is not None:
-   for line in lines:
-    count = count+1
-    for x1,y1,x2,y2 in line:
-        cv2.line(image,(x1,y1), (x2,y2), (255,0,0),1)
+    for line in lines:
+        for x1,y1,x2,y2 in line:
+            cv2.lines(line_image,(x1,y1), (x2,y2), (255,0,0),5)
         
-        
+plt.imshow(lines)
+'''  
+'''
 X1 = lines[:,0,0]
 X2 = lines[:,0,1]
 Y1 = lines[:,0,2]
@@ -70,11 +73,46 @@ b = (Y2-Y1)
 c = np.mean(((X2-X1)**2+(Y2-Y1)**2)**0.5)
 
 
+
+print(lines)
+
 #plt.imshow(image, 'gray')
+'''
 
 '''
-'''
+
 resize para matriz de coocurrencias
+
+para la clase partitura una buena es lo de los colores(en teoria porque luego como hay colores pues no es tan buena)
+
+#plot train
+    feat = X_train[:,0]
+    plt.figure()
+    plt.subplot(1,4,1)
+    plt.plot(feat[np.where(y_train==1), color='red'])
+    plt.figure()
+    plt.subplot(1,4,2)
+    plt.plot(feat[np.where(y_train==2), color='green'])
+    plt.figure()
+    plt.subplot(1,4,3)
+    plt.plot(feat[np.where(y_train==3), color='blue'])
+    plt.figure()
+    plt.subplot(1,4,4)
+    plt.plot(feat[np.where(y_train==4), color='black'])
+ #buena caracteristica para diferenciar brain y sheetmusic de helechos y grapes
+ luego si hacemos una que diferencie brains y sheetmusic ya se diferecniaria
+
+a plt.plot se le puede meter un sort np.sort() antes del feat de plt.plot   
+
+podemos usar el train  y test escaladas que es lo primero que se hace al entrar
+
+se puede utilizas scatter
+
+para hough quedarnos con las lineas grandes (grande r) o que sean mas o menos paralelas
+
+
+
+pca (seleccionar caracteristicas, lo explican el miercoles)
 '''
 
 
