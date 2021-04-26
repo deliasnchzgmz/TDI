@@ -23,7 +23,7 @@ image = cv2.imread('../data/test/unknown/58.jpg')
 plt.imshow(image, 'gray')
 imagegray = color.rgb2gray(image)
 imggauss = cv2.GaussianBlur(imagegray, (5,5), 0)
-kernel = np.array([[-1/9,-1/9,-1/9],[-1/9,5,-1/9], [-1/9,-1/9,-1/9]])
+kernel = np.array([[-1/9,-1/9,-1/9],[-1/9,(5-1/9),-1/9], [-1/9,-1/9,-1/9]])
 img_sharp = cv2.filter2D(imagegray, -1, kernel)
 img_256 = skimage.img_as_ubyte(image)
 
