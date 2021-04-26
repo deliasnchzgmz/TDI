@@ -11,9 +11,10 @@
 %                                                                       %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 """
-import os
+import os, math
 import cv2
 import skimage
+
 import natsort
 import numpy as np
 import colorsys
@@ -110,12 +111,14 @@ def imageProcessing(image):
     processed_images["image_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_gray"]), 256))[0]
     #processed_images["dep_histogram"] = (np.abs(processed_images["image_histogram"]))**2
     
-    #Añado para detectar lineas con la transformada de Hough
+    # Añadimos la imagen lbp como una entrada a la variable diccionario
+    processed_images["image_lbp"] = feature.texture.local_binary_pattern(processed_images["image_gray_filtered"], 8*3, 3)
     
     
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     return processed_images
+
 
 def linesImage(processed_images):
     """
@@ -127,24 +130,36 @@ def linesImage(processed_images):
     -------
     None.
     """
-    theta = np.pi/180 #resolucion angular en radianes de la cuadricula de hough
-    threshold = 20 #minimo num de cortes en la cuadricula
-    lines = cv2.HoughLines(processed_images["image_bordes"].astype(np.uint8), 1, theta, threshold, None, 0, 0)
-    deviation = 0
-    media = 0
+ 
     count = 0
-    if lines is not None:
-        for i in range(0, len(lines)):
-            theta = lines[i][0][1]
-            deviation = np.std(lines[:,:,1])
-            media = np.mean(lines[:,:,1])
-            count = i
-        if lines is None:
-            deviation = 15
-            media = 15
-            count = 0
+    stdSlope = 0
     
-    return deviation, media, count
+    theta = np.pi/180 #resolucion angular en radianes de la cuadricula de hough
+    threshold = 50 #minimo num de cortes en la cuadricula
+    min_line_length=40
+    max_line_gap = 10
+    
+    lines = cv2.HoughLinesP(processed_images["image_bordes"].astype(np.uint8),1,theta,threshold,minLineLength=min_line_length,maxLineGap=max_line_gap)
+    if lines is not None:
+       for line in lines:
+        count = count+1
+        for x1,y1,x2,y2 in line:
+            cv2.line(processed_images["image"]*0,(x1,y1), (x2,y2), (255,0,0),1)     
+       X1 = lines[:,0,0]
+       X2 = lines[:,0,1]
+       Y1 = lines[:,0,2]
+       Y2 = lines[:,0,3]            
+       slope = (Y2-Y1)/(X2-X1)
+       stdSlope = np.std(slope)
+       meanLength = np.mean(((X2-X1)**2+(Y2-Y1)**2)**0.5)
+       
+    if lines is None:
+        count = 0
+        stdSlope = 1000
+        meanLength = 1000
+        
+    return stdSlope, meanLength, count
+
 
 def extractFeatures(processed_images):
 
@@ -248,22 +263,12 @@ def extractFeatures(processed_images):
     #area_per = props.area/props.perimeter
     #features.append(area_per)
     
-    #fourier_lines = np.fft.fft2(processed_images["hough_lines"])
-    #dep_lines = np.abs(fourier) ** 2 #Densidad espectral de potencia
-    #fase_lines = np.angle(fourier) #Angulo de fase
-    #mediaDepLines = np.mean(dep_lines)
-    #mediaFaseLines = np.mean(fase_lines)
-    #desviacionDepLines = np.std(dep_lines)
-    #desviacionFaseLines = np.std(fase_lines)
-    #features.append(mediaFaseLines)
-    #features.append(mediaDepLines)
-    #features.append(desviacionDepLines)
-    #features.append(desviacionFaseLines)    
+    #stdSlope, meanLength, count = linesImage(processed_images)
+    #features.append(stdSlope)
+    #features.append(meanLength)
+    #features.append(count)
     
-    #stdHough, meanHough, countLines = linesImage(processed_images)
-    #features.append(stdHough)
-    #features.append(meanHough)
-    #features.append(countLines)
+    features.append(processed_images["image_lbp"])
 
     features = np.concatenate((features, contrast))
 
@@ -295,7 +300,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 13 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
