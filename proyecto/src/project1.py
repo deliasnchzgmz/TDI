@@ -82,9 +82,9 @@ def imageProcessing(image):
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
     
     # Añadimos la mascara de la imagen como una entrada a la variable diccionario
-    processed_images["image_binary"] = processed_images["image_sharpening"] > filters.threshold_local(processed_images["image_sharpening"],151)
+    processed_images["image_binary"] = (processed_images["image_sharpening"] > filters.threshold_mean(processed_images["image_sharpening"])).astype(np.uint8)
     
-    processed_images
+    processed_images['image_blur'] = cv2.medianBlur(processed_images['image_binary'], 11)
 
     # Añadimos la image en LAB
     #image_lab = color.rgb2lab(color.gray2rgb(image))
@@ -106,14 +106,14 @@ def imageProcessing(image):
     image_HSV = color.rgb2hsv(color.gray2rgb(image))
     #processed_images["image_HSV_H"] = image_HSV[:,:,0]
     processed_images["image_HSV_S"] = image_HSV[:,:,1]
-    #processed_images["image_HSV_V"] = image_HSV[:,:,2]
+   # processed_images["image_HSV_V"] = image_HSV[:,:,2]
 
     # Añadimos el histograma de la imagen en escala de grises
-    processed_images["image_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_gray"]), 256))[0]
+    #processed_images["image_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_gray"]), 256))[0]
     #processed_images["dep_histogram"] = (np.abs(processed_images["image_histogram"]))**2
     
     # Añadimos la imagen lbp como una entrada a la variable diccionario
-    processed_images["image_lbp"] = feature.texture.local_binary_pattern(processed_images["image_gray_filtered"], 8*3, 3)
+    #processed_images["image_lbp"] = feature.texture.local_binary_pattern(processed_images["image_gray_filtered"], 8*3, 3)
     
     
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -206,7 +206,7 @@ def extractFeatures(processed_images):
     properties = ['contrast'] #El contraste sera la propiedad que hallemos a partir de la matriz de co-ocurrencias
 
     #Calculamos la matriz de co-ocurrencias normalizada a partir de los parametros anteriormente descritos
-    glcm = feature.texture.greycomatrix(processed_images["image_gray_256"], distances=distances, angles=angles, levels=256, symmetric=True, normed=True)
+    glcm = feature.texture.greycomatrix(processed_images["image_binary"], distances=distances, angles=angles, levels=2, symmetric=True, normed=True)
 
     #Calculamos el contraste para las cuatro combinaciones de pares de pixeles según su ángulo
     #Acumulamos en un array los 4 valores que pasaremos como caracteristicas al clasificador
@@ -268,9 +268,20 @@ def extractFeatures(processed_images):
     #features.append(stdSlope)
     #features.append(meanLength)
     #features.append(count)
+    
+    #contamos las zonas de la máscara
+    
+    
+    label_mask = measure.label(processed_images['image_blur'])
+    regions_mask = measure.regionprops(label_mask)
+    nregions_mask = len(regions_mask)
+    features.append(nregions_mask)
+    
+    #features.append(np.mean(processed_images['image_binary']))
+    
 
+    
     features = np.concatenate((features, contrast))
-
     return features
 
 def databaseFeatures(db="../data/train"):
@@ -299,7 +310,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 13 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )

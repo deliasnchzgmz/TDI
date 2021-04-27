@@ -19,9 +19,9 @@ import pandas as pd
 import math
 import matplotlib.pyplot as plt
 
-image = cv2.imread('../data/test/unknown/69.jpg')
+image = cv2.imread('../data/test/unknown/2.jpg')
 #plt.imshow(image, 'gray')
-dsize = (200, 200)
+dsize = (300, 300)
 image = cv2.resize(image, dsize )
 imagegray = color.rgb2gray(image)
 kernel = np.array([[-1/9,-1/9,-1/9],[-1/9,(10-1/9),-1/9], [-1/9,-1/9,-1/9]])
@@ -30,18 +30,27 @@ imggauss = cv2.GaussianBlur(img_sharp, (5,5), 0)
 img_256 = skimage.img_as_ubyte(image)
 edges = np.uint8(np.array(image.shape))
 edges = (feature.canny(imagegray, sigma=2)).astype(np.uint8)
-img_canny = feature.canny(img_sharp, sigma=1.5)
+img_canny = feature.canny(img_sharp, sigma=3)
 
 # dsize
 
 
-mask = (img_sharp > filters.threshold_local(img_sharp,501)).astype(int)
+mask = (img_sharp > filters.threshold_mean(img_sharp)).astype(np.uint8)
 sum = np.mean(mask)
 
-#plt.subplot(1,2,1)
-plt.imshow(image, 'gray')
+blur1 = cv2.medianBlur(mask, 19)
+
+label_img = measure.label(blur1)
+regions = measure.regionprops(label_img)
+nregions = len(regions)
+
+plt.imshow(label_img)
 plt.show()
-plt.imshow(mask, 'gray')
+
+#plt.subplot(1,2,1)
+#plt.imshow(mask, 'gray')
+plt.show()
+#plt.imshow(blur1, 'gray')
 plt.show()
 #plt.subplot(1,2,2)
 #plt.imshow(resize)
