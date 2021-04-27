@@ -11,19 +11,19 @@
 %                                                                       %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 """
-import os, math, cv2, skimage, natsort, keras
+import os, math
+import cv2
+import skimage
+
+import natsort
 import numpy as np
-import pandas as pd
-import tensorflow as tf
 from scipy.stats import entropy
 from skimage.transform import hough_line, hough_line_peaks, probabilistic_hough_line
 from skimage import io, color, feature, measure ,filters, exposure
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
-from tensorflow.keras.optimizers import RMSprop
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-
+import pandas as pd
 
 def imageProcessing(image):
 
@@ -54,7 +54,7 @@ def imageProcessing(image):
 
     processed_images = {}
     # Ejemplo: Añadimos la imagen original como una entrada a la variable diccionario
-    processed_images["image"] = cv2.resize(image, (300,300))
+    processed_images["image"] = image
     
     # Añadimos la imagen en escala de grises como una entrada a la variable diccionario
     processed_images["image_gray"] = color.rgb2gray(image)
@@ -72,20 +72,13 @@ def imageProcessing(image):
     processed_images["image_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1.5)
     
     #Añadimos la imagen tras aplicar un filtrado de sharpening
+    kernel_bien_hecho = np.array([[-1/9,-1/9,-1/9],[-1/9,(10-1/9),-1/9], [-1/9,-1/9,-1/9]])
     kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
     
     #Añadimos una imagen de bordes con canny a partir de image sharpening
     processed_images["image_bordes"] = (feature.canny(processed_images["image_sharpening"], sigma=3)).astype(int)
     
-    # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
-    processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
-    
-    # Añadimos la mascara de la imagen como una entrada a la variable diccionario
-    processed_images["image_binary"] = processed_images["image_sharpening"] > filters.threshold_local(processed_images["image_sharpening"],151)
-    
-    processed_images
-
     # Añadimos la image en LAB
     #image_lab = color.rgb2lab(color.gray2rgb(image))
 
@@ -115,7 +108,6 @@ def imageProcessing(image):
     # Añadimos la imagen lbp como una entrada a la variable diccionario
     processed_images["image_lbp"] = feature.texture.local_binary_pattern(processed_images["image_gray_filtered"], 8*3, 3)
     
-    
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     return processed_images
@@ -135,7 +127,7 @@ def linesImage(processed_images):
     count = 0
     stdSlope = 0
     
-    theta = np.pi/180 #resolucion angular en radianes de la cuadricula de hough
+    theta = np.pi/10 #resolucion angular en radianes de la cuadricula de hough
     threshold = 50 #minimo num de cortes en la cuadricula
     min_line_length=40
     max_line_gap = 10
@@ -157,7 +149,7 @@ def linesImage(processed_images):
     if lines is None:
         count = 0
         stdSlope = 1000
-        meanLength = 0
+        meanLength = 1000
         
     return stdSlope, meanLength, count
 
@@ -204,13 +196,23 @@ def extractFeatures(processed_images):
     angles = [0, np.pi/4, np.pi/2, 3*np.pi/4] #Array con los diferentes ángulos (en radianes) que nos indican la orientación a la hora de considerar un píxel vecino
 
     properties = ['contrast'] #El contraste sera la propiedad que hallemos a partir de la matriz de co-ocurrencias
-
+    #properties2 = ['homogeneity']
+    #properties3 = ['ASM']
+    #properties4 = ['correlation']
+    #properties5 = ['dissimilarity']
+    #properties6 = ['energy']
     #Calculamos la matriz de co-ocurrencias normalizada a partir de los parametros anteriormente descritos
     glcm = feature.texture.greycomatrix(processed_images["image_gray_256"], distances=distances, angles=angles, levels=256, symmetric=True, normed=True)
+    
 
     #Calculamos el contraste para las cuatro combinaciones de pares de pixeles según su ángulo
     #Acumulamos en un array los 4 valores que pasaremos como caracteristicas al clasificador
     contrast = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties])
+    #homogeneity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties2])
+    #ASM = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties3])
+    #correlation = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties4])
+    #dissimilarity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties5])
+    #energy = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties6])
 
     #Contamos el numero de objetos que hay en la imagen con regionprops()
     label_img = measure.label(processed_images["image_sharpening"])
@@ -253,12 +255,12 @@ def extractFeatures(processed_images):
     #norm_hist = hist_img256/np.sum(hist_img256)
     #ent = entropy(norm_hist)
     #features.append(ent)
-
+    
 
     # Utilizamos la función skimage.measure.regionprops para obtener
     # descriptores de región de la imagen. Recibe como entrada la máscara
     # binaria de la imagen.
-    #props = measure.regionprops(processed_images["image_sharpening"].astype(int))
+    #props = measure.regionprops(processed_images["image_binary"].astype(int))
 
     # 6. rel_area_perimeter: Relacion area/perimetro de la region del pez
     #area_per = props.area/props.perimeter
@@ -268,7 +270,12 @@ def extractFeatures(processed_images):
     #features.append(stdSlope)
     #features.append(meanLength)
     #features.append(count)
-
+    
+    #hist_lbp, _ = np.histogram(processed_images["image_lbp"])
+    #norm_hist = hist_lbp/np.sum(hist_lbp)
+    #ent = np.std(norm_hist)
+    #features.append(ent)
+    
     features = np.concatenate((features, contrast))
 
     return features
