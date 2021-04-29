@@ -22,22 +22,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
 #from tensorflow.keras.optimizers import RMSprop
 #from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from sklearn.decomposition import PCA
 
-
-def PCA_algorithm(X_test):
-    X = X_test
-    pca = PCA(n_components=12)
-    pca.fit(X)
-    
-    vratio=pca.explained_variance_ratio_
-    print(vratio)
-    
-    svalues=pca.singular_values_
-    print(svalues)
-    
-    
-    return 1
 
 def imageProcessing(image):
 
@@ -204,7 +189,7 @@ def extractFeatures(processed_images):
     features = []
     # Utilizamos la imagen en escala de grises para obtener, como descriptor
     # baseline, su desviación típica (descriptor muy simple de textura).
-    image_gray = processed_images["image_contrast"]
+    image_gray = processed_images["image_gray"]
     std_gray = np.std(image_gray)
     features.append(std_gray)
 
@@ -253,12 +238,12 @@ def extractFeatures(processed_images):
     #features.append(mediaFase)
     #features.append(mediaDep)
     #features.append(desviacionDep)
-    #features.append(desviacionFase)
+    features.append(desviacionFase)
 
     ##solas no - con las tres sale 76.25
-    features.append(np.mean(processed_images["image_lab_l"]))
-    features.append(np.mean(processed_images["image_lab_a"]))
-    features.append(np.mean(processed_images["image_lab_b"]))
+    #features.append(np.mean(processed_images["image_lab_l"]))
+    #features.append(np.mean(processed_images["image_lab_a"]))
+    #features.append(np.mean(processed_images["image_lab_b"]))
 
     entropyMask = entropy(processed_images["mask_histogram"])
     #features.append(entropyMask)
@@ -297,10 +282,10 @@ def extractFeatures(processed_images):
     
     
     
-    label_mask = measure.label(processed_images["image_blur"])
+    label_mask = measure.label(processed_images['image_blur'])
     regions_mask = measure.regionprops(label_mask)
     nregions_mask = len(regions_mask)
-    features.append(nregions_mask)
+    #features.append(nregions_mask)
     
     #features.append(np.mean(processed_images['image_binary']))
     

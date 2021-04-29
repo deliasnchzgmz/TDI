@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -11,18 +10,33 @@
 %                                                                       %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 """
-import os, math, cv2, skimage, natsort, keras
+import os, math, cv2, skimage, natsort
+import mahotas
 import numpy as np
 import pandas as pd
-import tensorflow as tf
+#import tensorflow as tf
 from scipy.stats import entropy
 from skimage.transform import hough_line, hough_line_peaks, probabilistic_hough_line
 from skimage import io, color, feature, measure ,filters, exposure
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
-from tensorflow.keras.optimizers import RMSprop
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+#from tensorflow.keras.optimizers import RMSprop
+#from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+def PCA_algorithm(X_test):
+    X = X_test
+    pca = PCA(n_components=12)
+    pca.fit(X)
+    
+    print(vratio=pca.explained_variance_ratio_)
+    
+    print(svalues=pca.singular_values_)
+    
+    
+    return 1
 
 
 def imageProcessing(image):
@@ -82,13 +96,15 @@ def imageProcessing(image):
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
     
     # Añadimos la mascara de la imagen como una entrada a la variable diccionario
-    processed_images["image_binary"] = processed_images["image_sharpening"]
+    processed_images["image_binary"] = (processed_images["image_sharpening"] > filters.threshold_mean(processed_images["image_sharpening"])).astype(np.uint8)
+    
+    processed_images['image_blur'] = cv2.medianBlur(processed_images['image_binary'], 9)
 
     # Añadimos la image en LAB
-    #image_lab = color.rgb2lab(color.gray2rgb(image))
+    image_lab = color.rgb2lab(color.gray2rgb(processed_images['image_binary']))
 
     # Extraemos las componentes de la image_lab
-    #processed_images["image_lab_l"] = image_lab[:,:,0]
+    processed_images["image_lab_l"] = image_lab[:,:,0]
     #processed_images["image_lab_a"] = image_lab[:,:,1]
     #processed_images["image_lab_b"] = image_lab[:,:,2]
 
@@ -104,15 +120,16 @@ def imageProcessing(image):
     image_HSV = color.rgb2hsv(color.gray2rgb(image))
     #processed_images["image_HSV_H"] = image_HSV[:,:,0]
     processed_images["image_HSV_S"] = image_HSV[:,:,1]
-    #processed_images["image_HSV_V"] = image_HSV[:,:,2]
+   # processed_images["image_HSV_V"] = image_HSV[:,:,2]
 
     # Añadimos el histograma de la imagen en escala de grises
-    processed_images["image_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_gray"]), 256))[0]
+    processed_images["mask_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_binary"]), 256))[0]
     #processed_images["dep_histogram"] = (np.abs(processed_images["image_histogram"]))**2
     
     # Añadimos la imagen lbp como una entrada a la variable diccionario
-    processed_images["image_lbp"] = feature.texture.local_binary_pattern(processed_images["image_gray_filtered"], 8*3, 3)
+    #processed_images["image_lbp"] = feature.texture.local_binary_pattern(processed_images["image_gray_filtered"], 8*3, 3)
     
+
     
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -202,16 +219,26 @@ def extractFeatures(processed_images):
     angles = [0, np.pi/4, np.pi/2, 3*np.pi/4] #Array con los diferentes ángulos (en radianes) que nos indican la orientación a la hora de considerar un píxel vecino
 
     properties = ['contrast'] #El contraste sera la propiedad que hallemos a partir de la matriz de co-ocurrencias
+    properties2 = ['homogeneity']
+    properties3 = ['ASM']
+    properties4 = ['correlation']
+    properties5 = ['dissimilarity']
+    properties6 = ['energy']
 
     #Calculamos la matriz de co-ocurrencias normalizada a partir de los parametros anteriormente descritos
-    glcm = feature.texture.greycomatrix(processed_images["image_gray_256"], distances=distances, angles=angles, levels=256, symmetric=True, normed=True)
+    glcm = feature.texture.greycomatrix(processed_images["image_contrast"].astype(np.uint8), distances=distances, angles=angles, levels=256, symmetric=True, normed=True)
 
     #Calculamos el contraste para las cuatro combinaciones de pares de pixeles según su ángulo
     #Acumulamos en un array los 4 valores que pasaremos como caracteristicas al clasificador
     contrast = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties])
+    homogeneity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties2])
+    ASM = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties3])
+    correlation = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties4])
+    dissimilarity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties5])
+    energy = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties6])
 
     #Contamos el numero de objetos que hay en la imagen con regionprops()
-    label_img = measure.label(processed_images["image_binary"])
+    label_img = measure.label(processed_images["image_sharpening"])
     regions = measure.regionprops(label_img)
     nregions = len(regions)
     features.append(nregions)
@@ -219,6 +246,7 @@ def extractFeatures(processed_images):
     #Calculamos la transformada de fourier y diferentes caracteristicas
     fourier = np.fft.fft(processed_images["image_gray"])
     #dep = np.abs(fourier) ** 2 #Densidad espectral de potencia
+    absf = np.abs(fourier)
     fase = np.angle(fourier) #Angulo de fase
     #mediaDep = np.mean(dep)
     #mediaFase = np.mean(fase)
@@ -228,14 +256,15 @@ def extractFeatures(processed_images):
     #features.append(mediaDep)
     #features.append(desviacionDep)
     features.append(desviacionFase)
+    #features.append(np.sum(absf))
 
     ##solas no - con las tres sale 76.25
     #features.append(np.mean(processed_images["image_lab_l"]))
     #features.append(np.mean(processed_images["image_lab_a"]))
     #features.append(np.mean(processed_images["image_lab_b"]))
 
-    #stdHist = np.std(processed_images["image_histogram"])
-    #features.append(stdHist)
+    entropyMask = entropy(processed_images["mask_histogram"])
+    #features.append(entropyMask)
     
     
 
@@ -247,16 +276,16 @@ def extractFeatures(processed_images):
     features.append(np.mean(processed_images["image_HSV_S"]))
     #features.append(np.mean(processed_images["image_HSV_V"]))
 
-    #hist_img256, _ = np.histogram(processed_images["image_gray_256"])
-    #norm_hist = hist_img256/np.sum(hist_img256)
-    #ent = entropy(norm_hist)
+    hist_img256, _ = np.histogram(processed_images["image_binary"])
+    norm_hist = hist_img256/np.sum(hist_img256)
+    ent = entropy(norm_hist)
     #features.append(ent)
 
 
     # Utilizamos la función skimage.measure.regionprops para obtener
     # descriptores de región de la imagen. Recibe como entrada la máscara
     # binaria de la imagen.
-    #props = measure.regionprops(processed_images["image_binary"].astype(int))
+    #props = measure.regionprops(processed_images["image_sharpening"].astype(int))
 
     # 6. rel_area_perimeter: Relacion area/perimetro de la region del pez
     #area_per = props.area/props.perimeter
@@ -266,9 +295,22 @@ def extractFeatures(processed_images):
     #features.append(stdSlope)
     #features.append(meanLength)
     #features.append(count)
+    
 
+    
+    #features.append(measure.perimeter(processed_images['image_binary'],8))
+    #features.append(np.sum(processed_images['image_binary']))
+    
+    label_mask = measure.label(processed_images['image_blur'])
+    regions_mask = measure.regionprops(label_mask)
+    nregions_mask = len(regions_mask)
+    #features.append(nregions_mask)
+    
+    #features.append(np.mean(processed_images['image_binary']))
+    
+    #features.append(mahotas.features.eccentricity(processed_images['image_contrast']))
+    
     features = np.concatenate((features, contrast))
-
     return features
 
 def databaseFeatures(db="../data/train"):
@@ -352,7 +394,7 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
     del conjunto de imágenes de entrenamiento, 'model'.
 
     """
-    """
+
     # El siguiente código implementa el clasificador utilizado para el BASELINE
     # incluido en el challenge de Kaggle.
     # - - - NO ES NECESARIO MODIFICAR EL CLASIFICADOR PERO,
@@ -369,61 +411,18 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
     # Definición y entrenamiento del modelo
     model = MLPClassifier(hidden_layer_sizes=(np.maximum(10,np.ceil(np.shape(X_train)[1]/2).astype('uint8')),
                                               np.maximum(5,np.ceil(np.shape(X_train)[1]/4).astype('uint8'))),
-                                              max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
+                                               max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
                                               learning_rate_init=0.1)
-    
+    """
     for train_indices, val_indices in kf.split(X_train, y_train):
         model.fit(X_train[train_indices], y_train[train_indices])
-    
+    """
+
     model.fit(X_train, y_train)
 
-    """
-    train_brain_dir = os.path.join('../data/train', 'brain')
-    train_fern_dir = os.path.join('../data/train', 'fern')
-    train_grapes_dir = os.path.join('../data/train', 'grapes')
-    train_music_dir = os.path.join('../data/train', 'sheet-music')
-    
-    val_brain_dir = os.path.join('../data/train', 'brain')
-    val_fern_dir = os.path.join('../data/train', 'fern')
-    val_grapes_dir = os.path.join('../data/train', 'grapes')
-    val_music_dir = os.path.join('../data/train', 'sheet-music')
-    
-    X_val.append(val_brain_dir)
-    X_val.append(val_fern_dir)
-    X_val.append(val_grapes_dir)
-    X_val.append(val_music_dir)
 
-    
-    scaler = StandardScaler() ##normalización (lo dejo)
-    scaler.fit(X_train)
-    
-    model = tf.keras.models.Sequential([
-        # el input es de 150x150 en RGB
-        tf.keras.layers.Conv2D(16, (3,3), activation='relu', input_shape=(150, 150, 3)),
-        tf.keras.layers.MaxPooling2D(2,2),
-        tf.keras.layers.Conv2D(32, (3,3), activation='relu'),
-        tf.keras.layers.MaxPooling2D(2,2), 
-        tf.keras.layers.Conv2D(64, (3,3), activation='relu'), 
-        tf.keras.layers.MaxPooling2D(4,4),
-        # Siempre terminamos una "flatten"
-        tf.keras.layers.Flatten(),
-        # 512 neurones en una capa densa "hidden"
-        tf.keras.layers.Dense(512, activation='relu'), 
-        # El output es una sola neurona. 1 para la clase ('cats') y cero para la clase ('dogs')
-        tf.keras.layers.Dense(4, activation='softmax')  
-    ])
-    model.compile(optimizer=RMSprop(lr=0.001),
-              loss='binary_crossentropy',
-              metrics = ['accuracy'])
     ### - - - - - - - - - - - - - - - - - - - - - - - - -
-    train_datagen = ImageDataGenerator(rescale=1.0/255)
-    train_generator = train_datagen.flow_from_directory(('../data/train'), batch_size=20,target_size=(150,150))
-    
-    model.fit(train_generator,
-                    steps_per_epoch=100,
-                    epochs=15,
-                    validation_steps=50,
-                    verbose=2)
+
     return scaler, model
 
 def test_classifier(scaler, model, X_test):
@@ -529,5 +528,6 @@ if( __name__ == '__main__'):
     ids = [i+1 for i,e in enumerate(y_pred)]
     submission = pd.DataFrame({'Id':ids,'Category':y_pred})
     submission.to_csv(submission_csv_name,index=False)
+    
 
     print('¡Listo!')

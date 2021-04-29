@@ -11,6 +11,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 """
 import os, math, cv2, skimage, natsort
+import mahotas
 import numpy as np
 import pandas as pd
 #import tensorflow as tf
@@ -22,22 +23,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
 #from tensorflow.keras.optimizers import RMSprop
 #from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from sklearn.decomposition import PCA
 
-
-def PCA_algorithm(X_test):
-    X = X_test
-    pca = PCA(n_components=12)
-    pca.fit(X)
-    
-    vratio=pca.explained_variance_ratio_
-    print(vratio)
-    
-    svalues=pca.singular_values_
-    print(svalues)
-    
-    
-    return 1
 
 def imageProcessing(image):
 
@@ -101,10 +87,10 @@ def imageProcessing(image):
     processed_images['image_blur'] = cv2.medianBlur(processed_images['image_binary'], 9)
 
     # Añadimos la image en LAB
-    #image_lab = color.rgb2lab(color.gray2rgb(image))
+    image_lab = color.rgb2lab(color.gray2rgb(processed_images['image_binary']))
 
     # Extraemos las componentes de la image_lab
-    #processed_images["image_lab_l"] = image_lab[:,:,0]
+    processed_images["image_lab_l"] = image_lab[:,:,0]
     #processed_images["image_lab_a"] = image_lab[:,:,1]
     #processed_images["image_lab_b"] = image_lab[:,:,2]
 
@@ -129,6 +115,7 @@ def imageProcessing(image):
     # Añadimos la imagen lbp como una entrada a la variable diccionario
     #processed_images["image_lbp"] = feature.texture.local_binary_pattern(processed_images["image_gray_filtered"], 8*3, 3)
     
+
     
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -204,7 +191,7 @@ def extractFeatures(processed_images):
     features = []
     # Utilizamos la imagen en escala de grises para obtener, como descriptor
     # baseline, su desviación típica (descriptor muy simple de textura).
-    image_gray = processed_images["image_contrast"]
+    image_gray = processed_images["image_gray"]
     std_gray = np.std(image_gray)
     features.append(std_gray)
 
@@ -253,12 +240,12 @@ def extractFeatures(processed_images):
     #features.append(mediaFase)
     #features.append(mediaDep)
     #features.append(desviacionDep)
-    #features.append(desviacionFase)
+    features.append(desviacionFase)
 
     ##solas no - con las tres sale 76.25
-    features.append(np.mean(processed_images["image_lab_l"]))
-    features.append(np.mean(processed_images["image_lab_a"]))
-    features.append(np.mean(processed_images["image_lab_b"]))
+    #features.append(np.mean(processed_images["image_lab_l"]))
+    #features.append(np.mean(processed_images["image_lab_a"]))
+    #features.append(np.mean(processed_images["image_lab_b"]))
 
     entropyMask = entropy(processed_images["mask_histogram"])
     #features.append(entropyMask)
@@ -297,14 +284,14 @@ def extractFeatures(processed_images):
     
     
     
-    label_mask = measure.label(processed_images["image_blur"])
+    label_mask = measure.label(processed_images['image_blur'])
     regions_mask = measure.regionprops(label_mask)
     nregions_mask = len(regions_mask)
-    features.append(nregions_mask)
+    #features.append(nregions_mask)
     
     #features.append(np.mean(processed_images['image_binary']))
     
-
+    #features.append(mahotas.features.eccentricity(processed_images['image_contrast']))
     
     features = np.concatenate((features, contrast))
     return features
@@ -407,7 +394,7 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
     # Definición y entrenamiento del modelo
     model = MLPClassifier(hidden_layer_sizes=(np.maximum(10,np.ceil(np.shape(X_train)[1]/2).astype('uint8')),
                                               np.maximum(5,np.ceil(np.shape(X_train)[1]/4).astype('uint8'))),
-                                               max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
+                                               max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=34,
                                               learning_rate_init=0.1)
     """
     for train_indices, val_indices in kf.split(X_train, y_train):

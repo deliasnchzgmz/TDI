@@ -25,20 +25,6 @@ from sklearn.model_selection import KFold
 from sklearn.decomposition import PCA
 
 
-def PCA_algorithm(X_test):
-    X = X_test
-    pca = PCA(n_components=12)
-    pca.fit(X)
-    
-    vratio=pca.explained_variance_ratio_
-    print(vratio)
-    
-    svalues=pca.singular_values_
-    print(svalues)
-    
-    
-    return 1
-
 def imageProcessing(image):
 
     """
@@ -86,27 +72,31 @@ def imageProcessing(image):
     processed_images["image_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1.5)
     
     #Añadimos la imagen tras aplicar un filtrado de sharpening
-    kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
+    kernel = np.array([[-1/9,-1/9,-1/9],[-1/9,(5-1/9),-1/9], [-1/9,-1/9,-1/9]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
     
+    #añado una imagen de bordes con el gradiente
+    grad = np.array([[0,1,0],[1,-4,1], [0,1,0]])
+    processed_images["image_grad"] = cv2.filter2D(processed_images["image_contrast"])
+    
     #Añadimos una imagen de bordes con canny a partir de image sharpening
-    processed_images["image_bordes"] = (feature.canny(processed_images["image_sharpening"], sigma=3)).astype(int)
+    processed_images["image_bordes"] = (feature.canny(processed_images["image_gray_filtered"], sigma=3)).astype(int)
     
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
     
     # Añadimos la mascara de la imagen como una entrada a la variable diccionario
-    processed_images["image_binary"] = (processed_images["image_sharpening"] > filters.threshold_mean(processed_images["image_sharpening"])).astype(np.uint8)
+    processed_images["image_binary"] = (processed_images["image_contrast"] > filters.threshold_mean(processed_images["image_contrast"])).astype(np.uint8)
     
     processed_images['image_blur'] = cv2.medianBlur(processed_images['image_binary'], 9)
 
     # Añadimos la image en LAB
-    #image_lab = color.rgb2lab(color.gray2rgb(image))
+    image_lab = color.rgb2lab(color.gray2rgb(processed_images['image']))
 
     # Extraemos las componentes de la image_lab
-    #processed_images["image_lab_l"] = image_lab[:,:,0]
-    #processed_images["image_lab_a"] = image_lab[:,:,1]
-    #processed_images["image_lab_b"] = image_lab[:,:,2]
+    processed_images["image_lab_l"] = image_lab[:,:,0]
+    processed_images["image_lab_a"] = image_lab[:,:,1]
+    processed_images["image_lab_b"] = image_lab[:,:,2]
 
     # Extraemos las componentes de la image_RGB
     image_RGB = image
@@ -118,9 +108,9 @@ def imageProcessing(image):
 
     # Extraemos las componentes de la image_lab
     image_HSV = color.rgb2hsv(color.gray2rgb(image))
-    #processed_images["image_HSV_H"] = image_HSV[:,:,0]
+    processed_images["image_HSV_H"] = image_HSV[:,:,0]
     processed_images["image_HSV_S"] = image_HSV[:,:,1]
-   # processed_images["image_HSV_V"] = image_HSV[:,:,2]
+    processed_images["image_HSV_V"] = image_HSV[:,:,2]
 
     # Añadimos el histograma de la imagen en escala de grises
     processed_images["mask_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_binary"]), 256))[0]
@@ -207,106 +197,53 @@ def extractFeatures(processed_images):
     image_gray = processed_images["image_contrast"]
     std_gray = np.std(image_gray)
     features.append(std_gray)
-
-
-    canny = np.sum(processed_images["image_bordes"]==1)
-    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    
+    canny = np.sum((processed_images["image_bordes"]))
     features.append(canny)
-
-    distances = [4] #Distancia entre los pares de pixeles que iremos acumulando la matriz de co-ocurrencias
-
-    angles = [0, np.pi/4, np.pi/2, 3*np.pi/4] #Array con los diferentes ángulos (en radianes) que nos indican la orientación a la hora de considerar un píxel vecino
-
-    properties = ['contrast'] #El contraste sera la propiedad que hallemos a partir de la matriz de co-ocurrencias
-    properties2 = ['homogeneity']
-    properties3 = ['ASM']
-    properties4 = ['correlation']
-    properties5 = ['dissimilarity']
-    properties6 = ['energy']
-
-    #Calculamos la matriz de co-ocurrencias normalizada a partir de los parametros anteriormente descritos
-    glcm = feature.texture.greycomatrix(processed_images["image_gray_256"], distances=distances, angles=angles, levels=256, symmetric=True, normed=True)
-
-    #Calculamos el contraste para las cuatro combinaciones de pares de pixeles según su ángulo
-    #Acumulamos en un array los 4 valores que pasaremos como caracteristicas al clasificador
-    contrast = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties])
-    homogeneity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties2])
-    ASM = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties3])
-    correlation = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties4])
-    dissimilarity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties5])
-    energy = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties6])
-
-    #Contamos el numero de objetos que hay en la imagen con regionprops()
-    label_img = measure.label(processed_images["image_sharpening"])
+    
+    label_img = measure.label(processed_images["image_binary"])
     regions = measure.regionprops(label_img)
     nregions = len(regions)
     features.append(nregions)
-
-    #Calculamos la transformada de fourier y diferentes caracteristicas
+    
+    distances = [3] #Distancia entre los pares de pixeles que iremos acumulando la matriz de co-ocurrencias
+    angles = [0, np.pi/4, np.pi/2, 3*np.pi/4] #Array con los diferentes ángulos (en radianes) que nos indican la orientación a la hora de considerar un píxel vecino
+    properties = ['contrast']
+    
+    glcm = feature.texture.greycomatrix(processed_images["image_gray_256"], distances=distances, angles=angles, levels=256, symmetric=True, normed=True)
+    contrast = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties])
+    
     fourier = np.fft.fft(processed_images["image_gray"])
-    #dep = np.abs(fourier) ** 2 #Densidad espectral de potencia
+    dep = np.abs(fourier) ** 2 #Densidad espectral de potencia
     fase = np.angle(fourier) #Angulo de fase
-    #mediaDep = np.mean(dep)
-    #mediaFase = np.mean(fase)
-    #desviacionDep = np.std(dep)
+    mediaDep = np.mean(dep)
+    mediaFase = np.mean(fase)
+    desviacionDep = np.std(dep)
     desviacionFase = np.std(fase)
     #features.append(mediaFase)
     #features.append(mediaDep)
     #features.append(desviacionDep)
     #features.append(desviacionFase)
-
-    ##solas no - con las tres sale 76.25
+    
     features.append(np.mean(processed_images["image_lab_l"]))
     features.append(np.mean(processed_images["image_lab_a"]))
     features.append(np.mean(processed_images["image_lab_b"]))
-
-    entropyMask = entropy(processed_images["mask_histogram"])
-    #features.append(entropyMask)
     
+    features.append(np.mean((processed_images["image_RGB_R"])))
+    features.append(np.mean((processed_images["image_RGB_G"])))
+    features.append(np.mean((processed_images["image_RGB_B"])))
     
-
-    features.append(np.mean(np.abs(processed_images["image_RGB_R"])))
-    features.append(np.mean(np.abs(processed_images["image_RGB_G"])))
-    features.append(np.mean(np.abs(processed_images["image_RGB_B"])))
-
+    #features.append(np.std((processed_images["image_RGB_R"])))
+    #features.append(np.std((processed_images["image_RGB_G"])))
+    #features.append(np.std((processed_images["image_RGB_B"])))
+    
     #features.append(np.mean(processed_images["image_HSV_H"]))
     features.append(np.mean(processed_images["image_HSV_S"]))
     #features.append(np.mean(processed_images["image_HSV_V"]))
-
-    #hist_img256, _ = np.histogram(processed_images["image_gray_256"])
-    #norm_hist = hist_img256/np.sum(hist_img256)
-    #ent = entropy(norm_hist)
-    #features.append(ent)
-
-
-    # Utilizamos la función skimage.measure.regionprops para obtener
-    # descriptores de región de la imagen. Recibe como entrada la máscara
-    # binaria de la imagen.
-    #props = measure.regionprops(processed_images["image_sharpening"].astype(int))
-
-    # 6. rel_area_perimeter: Relacion area/perimetro de la region del pez
-    #area_per = props.area/props.perimeter
-    #features.append(area_per)
-    
-    #stdSlope, meanLength, count = linesImage(processed_images)
-    #features.append(stdSlope)
-    #features.append(meanLength)
-    #features.append(count)
-    
-
     
     
     
-    label_mask = measure.label(processed_images["image_blur"])
-    regions_mask = measure.regionprops(label_mask)
-    nregions_mask = len(regions_mask)
-    features.append(nregions_mask)
-    
-    #features.append(np.mean(processed_images['image_binary']))
-    
-
-    
-    features = np.concatenate((features, contrast))
+    features = np.concatenate((features,contrast))
     return features
 
 def databaseFeatures(db="../data/train"):
@@ -335,13 +272,13 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 14 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
     for i,imPath in enumerate(imPaths):
 
-        #print("\rProcessing {}".format(imPath), end='')
+        print("\rProcessing {}".format(imPath), end='')
         print('\r>>>> {}/{} done...'.format(i+1, len(imPaths)), end='')
 
         # leer la imagen del disco duro
