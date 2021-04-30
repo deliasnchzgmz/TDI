@@ -310,10 +310,10 @@ def extractFeatures(processed_images):
     features.append(np.mean(processed_images["image_HSV_S"]))
     #features.append(np.mean(processed_images["image_HSV_V"]))
 
-    hist_img_contrast, _ = np.histogram(processed_images["image_contrast"])
-    norm_hist_contrast = hist_img_contrast/np.sum(hist_img_contrast)
-    cdf = entropy(norm_hist_contrast)
-    features.append(np.std(cdf))
+    #hist_img256, _ = np.histogram(processed_images["image_gray_256"])
+    #norm_hist = hist_img256/np.sum(hist_img256)
+    #ent = entropy(norm_hist)
+    #features.append(ent)
 
 
     # Utilizamos la función skimage.measure.regionprops para obtener
@@ -332,20 +332,14 @@ def extractFeatures(processed_images):
     #features.append(num_lines)
     #features.append(middlePointX)
     features.append(middlePointY)
-    features.append(varSlope)
-    #features.append(varLength)
-    
-    hist_img_green, _ = np.histogram(processed_images["image_RGB_G"])
-    norm_hist_green = hist_img_green/np.sum(hist_img_green)
-    ent_green = np.mean(norm_hist_green)
-    #features.append(ent_green)    
+    #features.append(varSlope)
+    features.append(varLength)
 
     perimeter = (measure.perimeter(processed_images["image_binary"]))
     if perimeter==0:
         perimeter = 1
     area = cv2.countNonZero(processed_images["image_binary"])
-    #eatures.append(area/perimeter)
-    #features.append(area/np.size(processed_images["image_binary"]))
+    #features.append(area/perimeter)
     
     label_mask = measure.label(processed_images["image_blur"])
     regions_mask = measure.regionprops(label_mask)
@@ -382,7 +376,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 15 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 14 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
@@ -456,7 +450,7 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
     model = MLPClassifier(hidden_layer_sizes=(np.maximum(10,np.ceil(np.shape(X_train)[1]/2).astype('uint8')),
                                               np.maximum(5,np.ceil(np.shape(X_train)[1]/4).astype('uint8'))),
                                                max_iter=200, alpha=1e-04, solver='sgd', verbose=2, random_state=1,
-                                              learning_rate_init=0.1)
+                                              learning_rate_init=0.1, shuffle = True)
 
     """
     for train_indices, val_indices in kf.split(X_train, y_train):
