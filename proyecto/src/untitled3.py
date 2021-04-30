@@ -77,7 +77,7 @@ def imageProcessing(image):
     
     #añado una imagen de bordes con el gradiente
     grad = np.array([[0,1,0],[1,-4,1], [0,1,0]])
-    processed_images["image_grad"] = cv2.filter2D(processed_images["image_contrast"])
+    processed_images["image_grad"] = cv2.filter2D(processed_images["image_contrast"], -1,grad)
     
     #Añadimos una imagen de bordes con canny a partir de image sharpening
     processed_images["image_bordes"] = (feature.canny(processed_images["image_gray_filtered"], sigma=3)).astype(int)
@@ -108,9 +108,9 @@ def imageProcessing(image):
 
     # Extraemos las componentes de la image_lab
     image_HSV = color.rgb2hsv(color.gray2rgb(image))
-    processed_images["image_HSV_H"] = image_HSV[:,:,0]
+    #processed_images["image_HSV_H"] = image_HSV[:,:,0]
     processed_images["image_HSV_S"] = image_HSV[:,:,1]
-    processed_images["image_HSV_V"] = image_HSV[:,:,2]
+    #processed_images["image_HSV_V"] = image_HSV[:,:,2]
 
     # Añadimos el histograma de la imagen en escala de grises
     processed_images["mask_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_binary"]), 256))[0]

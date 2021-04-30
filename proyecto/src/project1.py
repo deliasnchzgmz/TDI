@@ -20,6 +20,8 @@ from skimage import io, color, feature, measure ,filters, exposure
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc
 #from tensorflow.keras.optimizers import RMSprop
 #from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from sklearn.decomposition import PCA
@@ -101,12 +103,12 @@ def imageProcessing(image):
     processed_images['image_blur'] = cv2.medianBlur(processed_images['image_binary'], 9)
 
     # Añadimos la image en LAB
-    #image_lab = color.rgb2lab(color.gray2rgb(image))
+    image_lab = color.rgb2lab(color.gray2rgb(image))
 
     # Extraemos las componentes de la image_lab
-    #processed_images["image_lab_l"] = image_lab[:,:,0]
-    #processed_images["image_lab_a"] = image_lab[:,:,1]
-    #processed_images["image_lab_b"] = image_lab[:,:,2]
+    processed_images["image_lab_l"] = image_lab[:,:,0]
+    processed_images["image_lab_a"] = image_lab[:,:,1]
+    processed_images["image_lab_b"] = image_lab[:,:,2]
 
     # Extraemos las componentes de la image_RGB
     image_RGB = image
@@ -146,34 +148,65 @@ def linesImage(processed_images):
     None.
     """
  
-    count = 0
-    stdSlope = 0
-    
+    num_lines = 0
+    #stdSlope = 0
+    slope = []
     theta = np.pi/180 #resolucion angular en radianes de la cuadricula de hough
     threshold = 50 #minimo num de cortes en la cuadricula
     min_line_length=40
     max_line_gap = 10
+    img0 = processed_images["image_contrast"]*0
     
-    lines = cv2.HoughLinesP(processed_images["image_bordes"].astype(np.uint8),1,theta,threshold,minLineLength=min_line_length,maxLineGap=max_line_gap)
+    sobel = np.array([[-1,-2,-1],[0,0,0], [1,2,1]])
+    imggrad = cv2.filter2D(processed_images["image_contrast"], -1, sobel)
+    cn =  feature.canny(imggrad, sigma=4).astype(np.uint8)
+    
+    lines = cv2.HoughLinesP(cn.astype(np.uint8),1,theta,threshold,minLineLength=min_line_length,maxLineGap=max_line_gap)
     if lines is not None:
        for line in lines:
-        count = count+1
+        num_lines = num_lines+1
         for x1,y1,x2,y2 in line:
-            cv2.line(processed_images["image"]*0,(x1,y1), (x2,y2), (255,0,0),1)     
+            cv2.line(img0,(x1,y1), (x2,y2), (255,0,0),1)    
+            if (x2-x1)!=0:
+                slope.append((y2-y1)/(x2-x1))
+            else:
+                slope.append(1000)
        X1 = lines[:,0,0]
        X2 = lines[:,0,1]
        Y1 = lines[:,0,2]
-       Y2 = lines[:,0,3]            
-       slope = (Y2-Y1)/(X2-X1)
+       Y2 = lines[:,0,3]      
+
        stdSlope = np.std(slope)
+       meanSlope = np.mean(slope)
        meanLength = np.mean(((X2-X1)**2+(Y2-Y1)**2)**0.5)
+       stdLength = np.std(((X2-X1)**2+(Y2-Y1)**2)**0.5)
+       
+       middlePointX = np.std([(X1+X2)/2])
+       middlePointY = np.std([(Y1+Y2)/2])
        
     if lines is None:
-        count = 0
-        stdSlope = 1000
+        stdSlope = 100
         meanLength = 0
+        stdLength = 100
+        meanSlope = 0
+        middlePointX = 0
+        middlePointY = 0
+        '''
+    if lines2 is not None:
+        for i in range(0, len(lines2)):
+            rho = lines2[i][0][0]
+            theta = lines2[i][0][1]
+            a = math.cos(theta)
+            b = math.sin(theta)
+            x0 = a * rho
+            y0 = b * rho
+            pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000*(a)))
+            pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
+            cv2.line(line_image, pt1, pt2, (0,0,255), 3, cv2.LINE_AA)
+        '''
         
-    return stdSlope, meanLength, count
+        
+    return stdSlope, meanSlope, stdLength, meanLength, num_lines, middlePointX, middlePointY
 
 
 def extractFeatures(processed_images):
@@ -204,7 +237,7 @@ def extractFeatures(processed_images):
     features = []
     # Utilizamos la imagen en escala de grises para obtener, como descriptor
     # baseline, su desviación típica (descriptor muy simple de textura).
-    image_gray = processed_images["image_contrast"]
+    image_gray = processed_images["image_gray"]
     std_gray = np.std(image_gray)
     features.append(std_gray)
 
@@ -253,12 +286,12 @@ def extractFeatures(processed_images):
     #features.append(mediaFase)
     #features.append(mediaDep)
     #features.append(desviacionDep)
-    #features.append(desviacionFase)
+    features.append(desviacionFase)
 
     ##solas no - con las tres sale 76.25
-    features.append(np.mean(processed_images["image_lab_l"]))
-    features.append(np.mean(processed_images["image_lab_a"]))
-    features.append(np.mean(processed_images["image_lab_b"]))
+    #features.append(np.mean(processed_images["image_lab_l"]))
+    #features.append(np.mean(processed_images["image_lab_a"]))
+    #features.append(np.mean(processed_images["image_lab_b"]))
 
     entropyMask = entropy(processed_images["mask_histogram"])
     #features.append(entropyMask)
@@ -284,27 +317,26 @@ def extractFeatures(processed_images):
     # binaria de la imagen.
     #props = measure.regionprops(processed_images["image_sharpening"].astype(int))
 
-    # 6. rel_area_perimeter: Relacion area/perimetro de la region del pez
+    #relacion area perimetro
     #area_per = props.area/props.perimeter
     #features.append(area_per)
     
-    #stdSlope, meanLength, count = linesImage(processed_images)
+    stdSlope, meanSlope, stdLength, meanLength, num_lines, middlePointX, middlePointY = linesImage(processed_images)
     #features.append(stdSlope)
+    #features.append(meanSlope)
     #features.append(meanLength)
-    #features.append(count)
-    
+    #features.append(num_lines)
+    #features.append(middlePointX)
+    features.append(middlePointY)
 
-    
-    
     
     label_mask = measure.label(processed_images["image_blur"])
     regions_mask = measure.regionprops(label_mask)
     nregions_mask = len(regions_mask)
-    features.append(nregions_mask)
+    #features.append(nregions_mask)
     
     #features.append(np.mean(processed_images['image_binary']))
     
-
     
     features = np.concatenate((features, contrast))
     return features
@@ -335,7 +367,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 13 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )

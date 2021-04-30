@@ -15,67 +15,100 @@ from skimage import io, color, feature, measure ,filters, exposure
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
+from sklearn.metrics import roc_curve, auc
 import pandas as pd
 import math
 import matplotlib.pyplot as plt
 
-for i in range(40):
-    
-    image = cv2.imread('../data/test/unknown/'+str(i)+ '.jpg')
-    #plt.imshow(image, 'gray')
-    dsize = (400, 400)
-    image = cv2.resize(image, dsize )
-    imagegray = color.rgb2gray(image)
-    
-    #imggauss = cv2.medianBlur(imagegray, 11, 0)
-    
-    kernel = np.array([[-1/9,-1/9,-1/9],[-1/9,(5-1/9),-1/9], [-1/9,-1/9,-1/9]])
-    imgcontrast = exposure.equalize_hist(imagegray)
-    img_sharp = cv2.filter2D(imgcontrast, -1, kernel)
-    img_256 = skimage.img_as_ubyte(image)
-    edges = np.uint8(np.array(image.shape))
-    edges = (feature.canny(imagegray, sigma=2)).astype(np.uint8)
-    img_canny1 = feature.canny(imagegray, sigma=3).astype(np.uint8)
-    img_canny2 = feature.canny(imagegray, sigma=4).astype(np.uint8)
-    canny = 3*img_canny1 - img_canny2
-    
-    # dsize
-    
-    
-    mask = (img_sharp > filters.threshold_mean(img_sharp)).astype(np.uint8)
-    sum = np.mean(mask)
-    
-    blur1 = cv2.medianBlur(mask, 19)
-    
-    th3 = cv2.adaptiveThreshold(imgcontrast.astype(np.uint8),255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
-    
-    label_img = measure.label(blur1)
-    regions = measure.regionprops(label_img)
-    nregions = len(regions)
-    
-    #plt.imshow(th3, 'gray')
-    plt.show()
-    
-    #plt.subplot(1,2,1)
-    #plt.imshow(mask, 'gray')
-    plt.show()
-    #plt.imshow(blur1, 'gray')
-    plt.show()
-    #plt.subplot(1,2,2)
-    #plt.imshow(resize)
-    
-    grad = np.array([[0,1,0],[1,-8,1], [0,1,0]])
-    grad1 = np.array([[-1,-1,-1],[0,0,0], [1,1,1]])
-    imggrad = cv2.filter2D(imgcontrast, -1, grad1)
-    cn =  feature.canny(imggrad, sigma=4).astype(np.uint8)
-    plt.imshow(imgcontrast, 'gray')
-    plt.show()
-    plt.imshow(imggrad, 'gray')
-    plt.show()
-    plt.imshow(cn, 'gray')
-    plt.show()
-        
 
+image = cv2.imread('../data/test/unknown/2.jpg')
+#plt.imshow(image, 'gray')
+dsize = (300, 300)
+image = cv2.resize(image, dsize )
+imagegray = color.rgb2gray(image)
+
+#imggauss = cv2.medianBlur(imagegray, 11, 0)
+
+kernel = np.array([[-1/9,-1/9,-1/9],[-1/9,(5-1/9),-1/9], [-1/9,-1/9,-1/9]])
+imgcontrast = exposure.equalize_hist(imagegray)
+img_sharp = cv2.filter2D(imgcontrast, -1, kernel)
+img_256 = skimage.img_as_ubyte(image)
+edges = np.uint8(np.array(image.shape))
+edges = (feature.canny(imagegray, sigma=2)).astype(np.uint8)
+img_canny1 = feature.canny(imagegray, sigma=3).astype(np.uint8)
+img_canny2 = feature.canny(imagegray, sigma=4).astype(np.uint8)
+canny = 3*img_canny1 - img_canny2
+
+
+
+# dsize
+
+
+mask = (img_sharp > filters.threshold_mean(img_sharp)).astype(np.uint8)
+sum = np.mean(mask)
+
+blur1 = cv2.medianBlur(mask, 19)
+
+th3 = cv2.adaptiveThreshold(imgcontrast.astype(np.uint8),255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
+
+label_img = measure.label(blur1)
+regions = measure.regionprops(label_img)
+nregions = len(regions)
+
+#plt.imshow(th3, 'gray')
+plt.show()
+
+#plt.subplot(1,2,1)
+#plt.imshow(mask, 'gray')
+plt.show()
+#plt.imshow(blur1, 'gray')
+plt.show()
+#plt.subplot(1,2,2)
+#plt.imshow(resize)
+
+grad = np.array([[0,1,0],[1,-8,1], [0,1,0]])
+grad1 = np.array([[-1,-2,-1],[0,0,0], [1,2,1]])
+imggrad = cv2.filter2D(imgcontrast, -1, grad1)
+cn =  feature.canny(imggrad, sigma=4).astype(np.uint8)
+plt.imshow(imgcontrast, 'gray')
+plt.show()
+#plt.imshow(imggrad, 'gray')
+#plt.show()
+#plt.imshow(cn, 'gray')
+plt.show()
+
+line_image = np.copy(imggrad)*0
+
+theta = np.pi/180 #resolucion angular en radianes de la cuadricula de hough
+threshold = 40 #minimo num de cortes en la cuadricula
+min_line_length=50
+max_line_gap = 10
+count = 0
+lines = cv2.HoughLinesP(cn.astype(np.uint8),1,theta,threshold,minLineLength=min_line_length,maxLineGap=max_line_gap)
+if lines is not None:
+       for line in lines:
+        count = count+1
+        for x1,y1,x2,y2 in line:
+            cv2.line(line_image,(x1,y1), (x2,y2), (255,0,0),1)     
+       X1 = lines[:,0,0]
+       X2 = lines[:,0,1]
+       Y1 = lines[:,0,2]
+       Y2 = lines[:,0,3]      
+       
+       slope = (Y2-Y1)/(X2-X1)
+       stdSlope = np.std(slope)
+       meanSlope = np.mean(slope)
+       meanLength = np.mean(((X2-X1)**2+(Y2-Y1)**2)**0.5)
+       stdLength = np.std(((X2-X1)**2+(Y2-Y1)**2)**0.5)
+       
+
+#plt.imshow(imggrad,'gray')
+plt.show()
+
+imggrad2 = cv2.filter2D(imggrad, -1, grad1)
+
+plt.imshow(line_image,'gray')
+plt.show()
 '''
 #5
 rho =1 #pixeles de distancia
