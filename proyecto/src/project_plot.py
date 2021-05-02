@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun May  2 23:10:13 2021
+
+@author: dl2pa
+"""
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -24,13 +31,27 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
 from sklearn.cluster import KMeans
 
+def Y_test():
+    y_test = np.arange(80).reshape(80,)
+    for i in range(20):
+        y_test [i] = 1
+    for i in range(20, 40, 1):
+        y_test [i] = 2
+    for i in range(40, 60, 1):
+        y_test [i] = 3
+    for i in range(60, 80, 1):
+        y_test [i] = 4
+        
+    return y_test 
 
 def plot2Features(X,y):
+    X = X
+    y = y
     plt.figure(1, figsize=(8,8))
-    plt.plot(X[y==1,2], X[y==1,0], 'b*', marker = 'o', alpha = 0.7, label = 'cerebros')
-    plt.plot(X[y==2,2], X[y==2,0], 'g*', marker = 'o', alpha = 0.7, label = 'helechos')
-    plt.plot(X[y==3,2], X[y==3,0], 'm*', marker = 'o', alpha = 0.7, label = 'uvas')
-    plt.plot(X[y==4,2], X[y==4,0], 'y*', marker = 'o', alpha = 0.7, label = 'partituras')
+    plt.plot(X[y==1,0], X[y==1,1], 'b*', marker = 'o', alpha = 0.7, label = 'cerebros')
+    plt.plot(X[y==2,0], X[y==2,1], 'g*', marker = 'o', alpha = 0.7, label = 'helechos')
+    plt.plot(X[y==3,0], X[y==3,1], 'm*', marker = 'o', alpha = 0.7, label = 'uvas')
+    plt.plot(X[y==4,0], X[y==4,1], 'y*', marker = 'o', alpha = 0.7, label = 'partituras')
     plt.xlabel('contrast 1', fontsize = 16)
     plt.ylabel('stdgray', fontsize = 16)
     plt.legend(prop={'size': 16})
@@ -265,12 +286,12 @@ def extractFeatures(processed_images):
     label_img = measure.label(processed_images["image_sharpening"])
     regions = measure.regionprops(label_img)
     nregions = len(regions)
-    #features.append(nregions)
+    features.append(nregions)
     
-    label_color = measure.label(color_segmentation(processed_images))
-    regions_color = measure.regionprops(label_color)
-    ncolor = len(regions_color)
-    features.append(ncolor)
+    #label_color = measure.label(color_segmentation(processed_images))
+    #regions_color = measure.regionprops(label_color)
+    #ncolor = len(regions_color)
+    #features.append(ncolor)
 
     #Calculamos la transformada de fourier y diferentes caracteristicas
     fourier = np.fft.fft(processed_images["image_gray"])
@@ -491,7 +512,7 @@ def eval_classifier(y, y_pred):
     print('Categorization Accuracy: {:.2f}'.format(catAcc))
 
 if( __name__ == '__main__'):
-
+    y_test = Y_test()
     """
     Cuando se ejecuta este script de python ('project1.py') la ejecución
     comenzará por aquí.
@@ -537,6 +558,7 @@ if( __name__ == '__main__'):
     submission.to_csv(submission_csv_name,index=False)
     
     # 5) print plots
-    #plot2Features((scaler.transform(X_train)), y_train)
+
+    plot2Features((scaler.transform(X_test)), y_test)
 
     print('¡Listo!')

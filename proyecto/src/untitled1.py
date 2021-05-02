@@ -40,7 +40,16 @@ img_canny2 = feature.canny(imagegray, sigma=4).astype(np.uint8)
 canny = 3*img_canny1 - img_canny2
 
 
-
+y = np.arange(80).reshape(80,1)
+for i in range(20):
+    y[i] = 1
+for i in range(20, 40, 1):
+    y[i] = 2
+for i in range(40, 60, 1):
+    y[i] = 3
+for i in range(60, 80, 1):
+    y[i] = 4
+    
 # dsize
 
 
