@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -10,31 +11,20 @@
 %                                                                       %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 """
-import os, math, cv2, skimage, natsort
+import os, math
+import cv2
+import skimage
+
+import natsort
 import numpy as np
-import pandas as pd
-#import tensorflow as tf
 from scipy.stats import entropy
 from skimage.transform import hough_line, hough_line_peaks, probabilistic_hough_line
 from skimage import io, color, feature, measure ,filters, exposure
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
-import matplotlib.pyplot as plt
-from sklearn.metrics import roc_curve, auc
+import pandas as pd
 
-
-def plot2Features(X,y):
-    plt.figure(1, figsize=(8,8))
-    plt.plot(X[y==1,0], X[y==1,1], 'b*', marker = 'o', alpha = 0.7, label = 'cerebros')
-    plt.plot(X[y==2,0], X[y==2,1], 'g*', marker = 'o', alpha = 0.7, label = 'helechos')
-    plt.plot(X[y==3,0], X[y==3,1], 'm*', marker = 'o', alpha = 0.7, label = 'uvas')
-    plt.plot(X[y==4,0], X[y==4,1], 'y*', marker = 'o', alpha = 0.7, label = 'partituras')
-    plt.xlabel('feature 1', fontsize = 16)
-    plt.ylabel('feature 2', fontsize = 16)
-    plt.legend(prop={'size': 16})
-    plt.show()
-    
 def imageProcessing(image):
 
     """
@@ -64,45 +54,38 @@ def imageProcessing(image):
 
     processed_images = {}
     # Ejemplo: Añadimos la imagen original como una entrada a la variable diccionario
-    processed_images["image"] = cv2.resize(image, (300,300))
-
+    processed_images["image"] = image
+    
     # Añadimos la imagen en escala de grises como una entrada a la variable diccionario
     processed_images["image_gray"] = color.rgb2gray(image)
-
+    
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
-
+    
     #contraste de imagen con igualacion de histograma
     processed_images["image_contrast"] = exposure.equalize_hist(processed_images["image_gray"])
-
+    
     # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
     processed_images["image_gray_filtered"] = filters.gaussian(processed_images["image_gray"], sigma=1)
-
+    
     # imagen bordes gauss
     processed_images["image_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1.5)
-
+    
     #Añadimos la imagen tras aplicar un filtrado de sharpening
+    kernel_bien_hecho = np.array([[-1/9,-1/9,-1/9],[-1/9,(10-1/9),-1/9], [-1/9,-1/9,-1/9]])
     kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
-
+    
     #Añadimos una imagen de bordes con canny a partir de image sharpening
     processed_images["image_bordes"] = (feature.canny(processed_images["image_sharpening"], sigma=3)).astype(int)
-
-    # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
-    processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
-
-    # Añadimos la mascara de la imagen como una entrada a la variable diccionario
-    processed_images["image_binary"] = (processed_images["image_sharpening"] > filters.threshold_mean(processed_images["image_sharpening"])).astype(np.uint8)
-
-    processed_images['image_blur'] = cv2.medianBlur(processed_images['image_binary'], 9)
-
+    
     # Añadimos la image en LAB
-    image_lab = color.rgb2lab(color.gray2rgb(image))
+    #image_lab = color.rgb2lab(color.gray2rgb(image))
 
     # Extraemos las componentes de la image_lab
-    processed_images["image_lab_l"] = image_lab[:,:,0]
-    processed_images["image_lab_a"] = image_lab[:,:,1]
-    processed_images["image_lab_b"] = image_lab[:,:,2]
+    #processed_images["image_lab_l"] = image_lab[:,:,0]
+    #processed_images["image_lab_a"] = image_lab[:,:,1]
+    #processed_images["image_lab_b"] = image_lab[:,:,2]
 
     # Extraemos las componentes de la image_RGB
     image_RGB = image
@@ -116,16 +99,15 @@ def imageProcessing(image):
     image_HSV = color.rgb2hsv(color.gray2rgb(image))
     #processed_images["image_HSV_H"] = image_HSV[:,:,0]
     processed_images["image_HSV_S"] = image_HSV[:,:,1]
-   # processed_images["image_HSV_V"] = image_HSV[:,:,2]
+    #processed_images["image_HSV_V"] = image_HSV[:,:,2]
 
     # Añadimos el histograma de la imagen en escala de grises
-    processed_images["mask_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_binary"]), 256))[0]
+    processed_images["image_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_gray"]), 256))[0]
     #processed_images["dep_histogram"] = (np.abs(processed_images["image_histogram"]))**2
-
+    
     # Añadimos la imagen lbp como una entrada a la variable diccionario
-    #processed_images["image_lbp"] = feature.texture.local_binary_pattern(processed_images["image_gray_filtered"], 8*3, 3)
-
-
+    processed_images["image_lbp"] = feature.texture.local_binary_pattern(processed_images["image_gray_filtered"], 8*3, 3)
+    
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     return processed_images
@@ -141,70 +123,35 @@ def linesImage(processed_images):
     -------
     None.
     """
-
-    num_lines = 0
-    #stdSlope = 0
-    slope = []
-    theta = np.pi/180 #resolucion angular en radianes de la cuadricula de hough
+ 
+    count = 0
+    stdSlope = 0
+    
+    theta = np.pi/10 #resolucion angular en radianes de la cuadricula de hough
     threshold = 50 #minimo num de cortes en la cuadricula
     min_line_length=40
     max_line_gap = 10
-    img0 = processed_images["image_contrast"]*0
-
-    sobel = np.array([[-1,-2,-1],[0,0,0], [1,2,1]])
-    imggrad = cv2.filter2D(processed_images["image_contrast"], -1, sobel)
-    cn =  feature.canny(imggrad, sigma=4).astype(np.uint8)
-
-    lines = cv2.HoughLinesP(cn.astype(np.uint8),1,theta,threshold,minLineLength=min_line_length,maxLineGap=max_line_gap)
+    
+    lines = cv2.HoughLinesP(processed_images["image_bordes"].astype(np.uint8),1,theta,threshold,minLineLength=min_line_length,maxLineGap=max_line_gap)
     if lines is not None:
        for line in lines:
-        num_lines = num_lines+1
+        count = count+1
         for x1,y1,x2,y2 in line:
-            cv2.line(img0,(x1,y1), (x2,y2), (255,0,0),1)
-            if (x2-x1)!=0:
-                slope.append((y2-y1)/(x2-x1))
-            else:
-                slope.append(1000)
+            cv2.line(processed_images["image"]*0,(x1,y1), (x2,y2), (255,0,0),1)     
        X1 = lines[:,0,0]
        X2 = lines[:,0,1]
        Y1 = lines[:,0,2]
-       Y2 = lines[:,0,3]
-
+       Y2 = lines[:,0,3]            
+       slope = (Y2-Y1)/(X2-X1)
        stdSlope = np.std(slope)
-       meanSlope = np.mean(slope)
        meanLength = np.mean(((X2-X1)**2+(Y2-Y1)**2)**0.5)
-       stdLength = np.std(((X2-X1)**2+(Y2-Y1)**2)**0.5)
-
-       middlePointX = np.std([(X1+X2)/2])
-       middlePointY = np.std([(Y1+Y2)/2])
-       varSlope = np.var(slope)
-       varLength = np.var(((X2-X1)**2+(Y2-Y1)**2)**0.5)
-
+       
     if lines is None:
-        stdSlope = 100
-        meanLength = 0
-        stdLength = 100
-        meanSlope = 0
-        middlePointX = 0
-        middlePointY = 0
-        varSlope = 0
-        varLength = 0
-        '''
-    if lines2 is not None:
-        for i in range(0, len(lines2)):
-            rho = lines2[i][0][0]
-            theta = lines2[i][0][1]
-            a = math.cos(theta)
-            b = math.sin(theta)
-            x0 = a * rho
-            y0 = b * rho
-            pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000*(a)))
-            pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
-            cv2.line(line_image, pt1, pt2, (0,0,255), 3, cv2.LINE_AA)
-        '''
-
-
-    return stdSlope, meanSlope, stdLength, meanLength, num_lines, middlePointX, middlePointY, varSlope, varLength
+        count = 0
+        stdSlope = 1000
+        meanLength = 1000
+        
+    return stdSlope, meanLength, count
 
 
 def extractFeatures(processed_images):
@@ -249,23 +196,23 @@ def extractFeatures(processed_images):
     angles = [0, np.pi/4, np.pi/2, 3*np.pi/4] #Array con los diferentes ángulos (en radianes) que nos indican la orientación a la hora de considerar un píxel vecino
 
     properties = ['contrast'] #El contraste sera la propiedad que hallemos a partir de la matriz de co-ocurrencias
-    properties2 = ['homogeneity']
-    properties3 = ['ASM']
-    properties4 = ['correlation']
-    properties5 = ['dissimilarity']
-    properties6 = ['energy']
-
+    #properties2 = ['homogeneity']
+    #properties3 = ['ASM']
+    #properties4 = ['correlation']
+    #properties5 = ['dissimilarity']
+    #properties6 = ['energy']
     #Calculamos la matriz de co-ocurrencias normalizada a partir de los parametros anteriormente descritos
     glcm = feature.texture.greycomatrix(processed_images["image_gray_256"], distances=distances, angles=angles, levels=256, symmetric=True, normed=True)
+    
 
     #Calculamos el contraste para las cuatro combinaciones de pares de pixeles según su ángulo
     #Acumulamos en un array los 4 valores que pasaremos como caracteristicas al clasificador
     contrast = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties])
-    homogeneity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties2])
-    ASM = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties3])
-    correlation = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties4])
-    dissimilarity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties5])
-    energy = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties6])
+    #homogeneity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties2])
+    #ASM = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties3])
+    #correlation = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties4])
+    #dissimilarity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties5])
+    #energy = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties6])
 
     #Contamos el numero de objetos que hay en la imagen con regionprops()
     label_img = measure.label(processed_images["image_sharpening"])
@@ -291,10 +238,10 @@ def extractFeatures(processed_images):
     #features.append(np.mean(processed_images["image_lab_a"]))
     #features.append(np.mean(processed_images["image_lab_b"]))
 
-    entropyMask = entropy(processed_images["mask_histogram"])
-    #features.append(entropyMask)
-
-
+    #stdHist = np.std(processed_images["image_histogram"])
+    #features.append(stdHist)
+    
+    
 
     features.append(np.mean(np.abs(processed_images["image_RGB_R"])))
     features.append(np.mean(np.abs(processed_images["image_RGB_G"])))
@@ -309,29 +256,28 @@ def extractFeatures(processed_images):
     #ent = entropy(norm_hist)
     #features.append(ent)
     
-    stdSlope, meanSlope, stdLength, meanLength, num_lines, middlePointX, middlePointY, varSlope, varLength = linesImage(processed_images)
+
+    # Utilizamos la función skimage.measure.regionprops para obtener
+    # descriptores de región de la imagen. Recibe como entrada la máscara
+    # binaria de la imagen.
+    #props = measure.regionprops(processed_images["image_binary"].astype(int))
+
+    # 6. rel_area_perimeter: Relacion area/perimetro de la region del pez
+    #area_per = props.area/props.perimeter
+    #features.append(area_per)
+    
+    #stdSlope, meanLength, count = linesImage(processed_images)
     #features.append(stdSlope)
-    #features.append(meanSlope)
     #features.append(meanLength)
-    #features.append(num_lines)
-    #features.append(middlePointX)
-    features.append(middlePointY)
-    #features.append(varSlope)
-    features.append(varLength)
-
-    perimeter = (measure.perimeter(processed_images["image_binary"]))
-    if perimeter==0:
-        perimeter = 1
-    area = cv2.countNonZero(processed_images["image_binary"])
-    #features.append(area/perimeter)
-
-    label_mask = measure.label(processed_images["image_blur"])
-    regions_mask = measure.regionprops(label_mask)
-    nregions_mask = len(regions_mask)
-    #features.append(nregions_mask)
-
-
+    #features.append(count)
+    
+    #hist_lbp, _ = np.histogram(processed_images["image_lbp"])
+    #norm_hist = hist_lbp/np.sum(hist_lbp)
+    #ent = np.std(norm_hist)
+    #features.append(ent)
+    
     features = np.concatenate((features, contrast))
+
     return features
 
 def databaseFeatures(db="../data/train"):
@@ -360,7 +306,7 @@ def databaseFeatures(db="../data/train"):
 
     # Matriz de caracteristicas X
     # Para el BASELINE incluido en el challenge de Kaggle, se utiliza 1 feature
-    num_features = 14 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
+    num_features = 12 # MODIFICAR, INDICANDO EL NÚMERO DE CARACTERÍSTICAS EXTRAÍDAS
     num_images = len(imPaths)
 
     X = np.zeros( (num_images,num_features) )
@@ -430,12 +376,10 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
 
     #kf = KFold(n_splits=1)
     # Definición y entrenamiento del modelo
-
     model = MLPClassifier(hidden_layer_sizes=(np.maximum(10,np.ceil(np.shape(X_train)[1]/2).astype('uint8')),
                                               np.maximum(5,np.ceil(np.shape(X_train)[1]/4).astype('uint8'))),
-                                               max_iter=200, alpha=0.01, solver='sgd', verbose=2, random_state=1,
+                                               max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
                                               learning_rate_init=0.1)
-
     """
     for train_indices, val_indices in kf.split(X_train, y_train):
         model.fit(X_train[train_indices], y_train[train_indices])
@@ -551,8 +495,5 @@ if( __name__ == '__main__'):
     ids = [i+1 for i,e in enumerate(y_pred)]
     submission = pd.DataFrame({'Id':ids,'Category':y_pred})
     submission.to_csv(submission_csv_name,index=False)
-    
-    # 5) print plots
-    plot2Features((scaler.transform(X_train)), y_train)
 
     print('¡Listo!')

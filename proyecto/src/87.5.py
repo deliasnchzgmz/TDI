@@ -31,14 +31,14 @@ def PCA_algorithm(X_test):
     X = X_test
     pca = PCA(n_components=12)
     pca.fit(X)
-    
+
     vratio=pca.explained_variance_ratio_
     print(vratio)
-    
+
     svalues=pca.singular_values_
     print(svalues)
-    
-    
+
+
     return 1
 
 def imageProcessing(image):
@@ -71,35 +71,35 @@ def imageProcessing(image):
     processed_images = {}
     # Ejemplo: Añadimos la imagen original como una entrada a la variable diccionario
     processed_images["image"] = cv2.resize(image, (300,300))
-    
+
     # Añadimos la imagen en escala de grises como una entrada a la variable diccionario
     processed_images["image_gray"] = color.rgb2gray(image)
-    
+
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
-    
+
     #contraste de imagen con igualacion de histograma
     processed_images["image_contrast"] = exposure.equalize_hist(processed_images["image_gray"])
-    
+
     # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
     processed_images["image_gray_filtered"] = filters.gaussian(processed_images["image_gray"], sigma=1)
-    
+
     # imagen bordes gauss
     processed_images["image_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1.5)
-    
+
     #Añadimos la imagen tras aplicar un filtrado de sharpening
     kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
-    
+
     #Añadimos una imagen de bordes con canny a partir de image sharpening
     processed_images["image_bordes"] = (feature.canny(processed_images["image_sharpening"], sigma=3)).astype(int)
-    
+
     # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
-    
+
     # Añadimos la mascara de la imagen como una entrada a la variable diccionario
     processed_images["image_binary"] = (processed_images["image_sharpening"] > filters.threshold_mean(processed_images["image_sharpening"])).astype(np.uint8)
-    
+
     processed_images['image_blur'] = cv2.medianBlur(processed_images['image_binary'], 9)
 
     # Añadimos la image en LAB
@@ -127,11 +127,11 @@ def imageProcessing(image):
     # Añadimos el histograma de la imagen en escala de grises
     processed_images["mask_histogram"] = (np.histogram(np.ndarray.flatten(processed_images["image_binary"]), 256))[0]
     #processed_images["dep_histogram"] = (np.abs(processed_images["image_histogram"]))**2
-    
+
     # Añadimos la imagen lbp como una entrada a la variable diccionario
     #processed_images["image_lbp"] = feature.texture.local_binary_pattern(processed_images["image_gray_filtered"], 8*3, 3)
-    
-    
+
+
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     return processed_images
@@ -147,7 +147,7 @@ def linesImage(processed_images):
     -------
     None.
     """
- 
+
     num_lines = 0
     #stdSlope = 0
     slope = []
@@ -156,17 +156,17 @@ def linesImage(processed_images):
     min_line_length=40
     max_line_gap = 10
     img0 = processed_images["image_contrast"]*0
-    
+
     sobel = np.array([[-1,-2,-1],[0,0,0], [1,2,1]])
     imggrad = cv2.filter2D(processed_images["image_contrast"], -1, sobel)
     cn =  feature.canny(imggrad, sigma=4).astype(np.uint8)
-    
+
     lines = cv2.HoughLinesP(cn.astype(np.uint8),1,theta,threshold,minLineLength=min_line_length,maxLineGap=max_line_gap)
     if lines is not None:
        for line in lines:
         num_lines = num_lines+1
         for x1,y1,x2,y2 in line:
-            cv2.line(img0,(x1,y1), (x2,y2), (255,0,0),1)    
+            cv2.line(img0,(x1,y1), (x2,y2), (255,0,0),1)
             if (x2-x1)!=0:
                 slope.append((y2-y1)/(x2-x1))
             else:
@@ -174,18 +174,18 @@ def linesImage(processed_images):
        X1 = lines[:,0,0]
        X2 = lines[:,0,1]
        Y1 = lines[:,0,2]
-       Y2 = lines[:,0,3]      
+       Y2 = lines[:,0,3]
 
        stdSlope = np.std(slope)
        meanSlope = np.mean(slope)
        meanLength = np.mean(((X2-X1)**2+(Y2-Y1)**2)**0.5)
        stdLength = np.std(((X2-X1)**2+(Y2-Y1)**2)**0.5)
-       
+
        middlePointX = np.std([(X1+X2)/2])
        middlePointY = np.std([(Y1+Y2)/2])
        varSlope = np.var(slope)
        varLength = np.var(((X2-X1)**2+(Y2-Y1)**2)**0.5)
-       
+
     if lines is None:
         stdSlope = 100
         meanLength = 0
@@ -208,8 +208,8 @@ def linesImage(processed_images):
             pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
             cv2.line(line_image, pt1, pt2, (0,0,255), 3, cv2.LINE_AA)
         '''
-        
-        
+
+
     return stdSlope, meanSlope, stdLength, meanLength, num_lines, middlePointX, middlePointY, varSlope, varLength
 
 
@@ -299,8 +299,8 @@ def extractFeatures(processed_images):
 
     entropyMask = entropy(processed_images["mask_histogram"])
     #features.append(entropyMask)
-    
-    
+
+
 
     features.append(np.mean(np.abs(processed_images["image_RGB_R"])))
     features.append(np.mean(np.abs(processed_images["image_RGB_G"])))
@@ -314,16 +314,6 @@ def extractFeatures(processed_images):
     #norm_hist = hist_img256/np.sum(hist_img256)
     #ent = entropy(norm_hist)
     #features.append(ent)
-
-
-    # Utilizamos la función skimage.measure.regionprops para obtener
-    # descriptores de región de la imagen. Recibe como entrada la máscara
-    # binaria de la imagen.
-    #props = measure.regionprops(processed_images["image_sharpening"].astype(int))
-
-    #relacion area perimetro
-    #area_per = props.area/props.perimeter
-    #features.append(area_per)
     
     stdSlope, meanSlope, stdLength, meanLength, num_lines, middlePointX, middlePointY, varSlope, varLength = linesImage(processed_images)
     #features.append(stdSlope)
@@ -340,13 +330,13 @@ def extractFeatures(processed_images):
         perimeter = 1
     area = cv2.countNonZero(processed_images["image_binary"])
     #features.append(area/perimeter)
-    
+
     label_mask = measure.label(processed_images["image_blur"])
     regions_mask = measure.regionprops(label_mask)
     nregions_mask = len(regions_mask)
     #features.append(nregions_mask)
-        
-    
+
+
     features = np.concatenate((features, contrast))
     return features
 

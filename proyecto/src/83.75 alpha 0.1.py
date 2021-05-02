@@ -22,19 +22,25 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
+#from tensorflow.keras.optimizers import RMSprop
+#from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from sklearn.decomposition import PCA
 
 
-def plot2Features(X,y):
-    plt.figure(1, figsize=(8,8))
-    plt.plot(X[y==1,0], X[y==1,1], 'b*', marker = 'o', alpha = 0.7, label = 'cerebros')
-    plt.plot(X[y==2,0], X[y==2,1], 'g*', marker = 'o', alpha = 0.7, label = 'helechos')
-    plt.plot(X[y==3,0], X[y==3,1], 'm*', marker = 'o', alpha = 0.7, label = 'uvas')
-    plt.plot(X[y==4,0], X[y==4,1], 'y*', marker = 'o', alpha = 0.7, label = 'partituras')
-    plt.xlabel('feature 1', fontsize = 16)
-    plt.ylabel('feature 2', fontsize = 16)
-    plt.legend(prop={'size': 16})
-    plt.show()
-    
+def PCA_algorithm(X_test):
+    X = X_test
+    pca = PCA(n_components=12)
+    pca.fit(X)
+
+    vratio=pca.explained_variance_ratio_
+    print(vratio)
+
+    svalues=pca.singular_values_
+    print(svalues)
+
+
+    return 1
+
 def imageProcessing(image):
 
     """
@@ -73,7 +79,7 @@ def imageProcessing(image):
     processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
 
     #contraste de imagen con igualacion de histograma
-    processed_images["image_contrast"] = exposure.equalize_hist(processed_images["image_gray"])
+    processed_images["image_contrast"] = (exposure.equalize_hist(processed_images["image_gray"]))
 
     # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
     processed_images["image_gray_filtered"] = filters.gaussian(processed_images["image_gray"], sigma=1)
@@ -87,9 +93,6 @@ def imageProcessing(image):
 
     #Añadimos una imagen de bordes con canny a partir de image sharpening
     processed_images["image_bordes"] = (feature.canny(processed_images["image_sharpening"], sigma=3)).astype(int)
-
-    # Añadimos la imagen en escala de grises con 256 niveles de gris para poder utilizarla en la matriz de co-ocurrencias
-    processed_images["image_gray_256"] = skimage.img_as_ubyte(processed_images["image_gray"])
 
     # Añadimos la mascara de la imagen como una entrada a la variable diccionario
     processed_images["image_binary"] = (processed_images["image_sharpening"] > filters.threshold_mean(processed_images["image_sharpening"])).astype(np.uint8)
@@ -329,7 +332,7 @@ def extractFeatures(processed_images):
     regions_mask = measure.regionprops(label_mask)
     nregions_mask = len(regions_mask)
     #features.append(nregions_mask)
-
+    
 
     features = np.concatenate((features, contrast))
     return features
@@ -433,7 +436,7 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
 
     model = MLPClassifier(hidden_layer_sizes=(np.maximum(10,np.ceil(np.shape(X_train)[1]/2).astype('uint8')),
                                               np.maximum(5,np.ceil(np.shape(X_train)[1]/4).astype('uint8'))),
-                                               max_iter=200, alpha=0.01, solver='sgd', verbose=2, random_state=1,
+                                               max_iter=200, alpha=0.4, solver='sgd', verbose=2, random_state=1,
                                               learning_rate_init=0.1)
 
     """
@@ -551,8 +554,5 @@ if( __name__ == '__main__'):
     ids = [i+1 for i,e in enumerate(y_pred)]
     submission = pd.DataFrame({'Id':ids,'Category':y_pred})
     submission.to_csv(submission_csv_name,index=False)
-    
-    # 5) print plots
-    plot2Features((scaler.transform(X_train)), y_train)
 
     print('¡Listo!')
