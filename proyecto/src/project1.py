@@ -98,12 +98,12 @@ def imageProcessing(image):
     processed_images['image_blur'] = cv2.medianBlur(processed_images['image_binary'], 9)
 
     # Añadimos la image en LAB
-    image_lab = color.rgb2lab(color.gray2rgb(image))
+    #image_lab = color.rgb2lab(color.gray2rgb(image))
 
     # Extraemos las componentes de la image_lab
-    processed_images["image_lab_l"] = image_lab[:,:,0]
-    processed_images["image_lab_a"] = image_lab[:,:,1]
-    processed_images["image_lab_b"] = image_lab[:,:,2]
+    #processed_images["image_lab_l"] = image_lab[:,:,0]
+    #processed_images["image_lab_a"] = image_lab[:,:,1]
+    #processed_images["image_lab_b"] = image_lab[:,:,2]
 
     # Extraemos las componentes de la image_RGB
     image_RGB = image
@@ -265,12 +265,12 @@ def extractFeatures(processed_images):
     label_img = measure.label(processed_images["image_sharpening"])
     regions = measure.regionprops(label_img)
     nregions = len(regions)
-    #features.append(nregions)
+    features.append(nregions)
     
     label_color = measure.label(color_segmentation(processed_images))
     regions_color = measure.regionprops(label_color)
     ncolor = len(regions_color)
-    features.append(ncolor)
+    #features.append(ncolor)
 
     #Calculamos la transformada de fourier y diferentes caracteristicas
     fourier = np.fft.fft(processed_images["image_gray"])
@@ -417,7 +417,7 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
 
     model = MLPClassifier(hidden_layer_sizes=(np.maximum(10,np.ceil(np.shape(X_train)[1]/2).astype('uint8')),
                                               np.maximum(5,np.ceil(np.shape(X_train)[1]/4).astype('uint8'))),
-                                               max_iter=200, alpha=0.01, solver='sgd', verbose=2, random_state=1,
+                                              max_iter=200, alpha=1e-4, solver='sgd', verbose=0, random_state=1,
                                               learning_rate_init=0.1)
 
     """
