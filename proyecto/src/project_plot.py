@@ -28,6 +28,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import KFold
 import matplotlib.pyplot as plt
+#from mpl_toolkits.mplot3d import Axes3D
 from sklearn.metrics import roc_curve, auc
 from sklearn.cluster import KMeans
 
@@ -47,14 +48,22 @@ def Y_test():
 def plot2Features(X,y):
     X = X
     y = y
-    plt.figure(1, figsize=(8,8))
+    fig = plt.figure(1, figsize=(8,8))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(X[y==1,4], X[y==1,5],X[y==1,6], 'b*', marker = 'o', alpha = 0.7, label = 'cerebros')
+    ax.scatter(X[y==2,4], X[y==2,5],X[y==2,6], 'g*', marker = 'o', alpha = 0.7, label = 'helechos')
+    ax.scatter(X[y==3,4], X[y==3,5],X[y==3,6], 'm*', marker = 'o', alpha = 0.7, label = 'uvas')
+    ax.scatter(X[y==4,4], X[y==4,5],X[y==4,6], 'y*', marker = 'o', alpha = 0.7, label = 'partituras')
+    '''
     plt.plot(X[y==1,0], X[y==1,1], 'b*', marker = 'o', alpha = 0.7, label = 'cerebros')
     plt.plot(X[y==2,0], X[y==2,1], 'g*', marker = 'o', alpha = 0.7, label = 'helechos')
     plt.plot(X[y==3,0], X[y==3,1], 'm*', marker = 'o', alpha = 0.7, label = 'uvas')
     plt.plot(X[y==4,0], X[y==4,1], 'y*', marker = 'o', alpha = 0.7, label = 'partituras')
-    plt.xlabel('contrast 1', fontsize = 16)
-    plt.ylabel('stdgray', fontsize = 16)
-    plt.legend(prop={'size': 16})
+    '''
+    ax.set_xlabel('Red', fontsize = 16)
+    ax.set_ylabel('Green', fontsize = 16)
+    ax.set_zlabel('Blue', fontsize = 16)
+    ax.legend(loc="best",prop={'size': 16})
     plt.show()
     
 def imageProcessing(image):
