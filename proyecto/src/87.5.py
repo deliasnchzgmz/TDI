@@ -51,6 +51,7 @@ def imageProcessing(image):
 
     processed_images = {}
     # Ejemplo: Añadimos la imagen original como una entrada a la variable diccionario
+    # Además estandarizamos el tamaño de las imágenes
     processed_images["image"] = cv2.resize(image, (300,300))
 
     # Añadimos la imagen en escala de grises como una entrada a la variable diccionario
@@ -62,12 +63,6 @@ def imageProcessing(image):
     #contraste de imagen con igualacion de histograma
     processed_images["image_contrast"] = exposure.equalize_hist(processed_images["image_gray"])
 
-    # Añadimos la imagen en escala de grises filtrada con un filtro gaussiano
-    processed_images["image_gray_filtered"] = filters.gaussian(processed_images["image_gray"], sigma=1)
-
-    # imagen bordes gauss
-    processed_images["image_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1.5)
-
     #Añadimos la imagen tras aplicar un filtrado sharpening agresivo
     kernel = np.array([[-1,-1,-1],[-1,4,-1], [-1,-1,-1]])
     processed_images["image_sharpening"] = cv2.filter2D(processed_images["image_gray"], -1, kernel)
@@ -78,16 +73,6 @@ def imageProcessing(image):
     # Añadimos la mascara de la imagen como una entrada a la variable diccionario
     processed_images["image_mask"] = (processed_images["image_sharpening"] > filters.threshold_mean(processed_images["image_sharpening"])).astype(np.uint8)
 
-    processed_images['image_blur'] = cv2.medianBlur(processed_images['image_mask'], 9)
-
-    # Añadimos la image en LAB
-    image_lab = color.rgb2lab(color.gray2rgb(image))
-
-    # Extraemos las componentes de la image_lab
-    processed_images["image_lab_l"] = image_lab[:,:,0]
-    processed_images["image_lab_a"] = image_lab[:,:,1]
-    processed_images["image_lab_b"] = image_lab[:,:,2]
-
     # Extraemos las componentes de la image_RGB
     image_RGB = image
     if len(image.shape)==2:
@@ -96,11 +81,33 @@ def imageProcessing(image):
     processed_images["image_RGB_G"] = image_RGB[:,:,1]
     processed_images["image_RGB_B"] = image_RGB[:,:,2]
 
-    # Extraemos las componentes de la image_lab
+    # Extraemos la componente de saturación del espacio HSV
     image_HSV = color.rgb2hsv(color.gray2rgb(image))
-    #processed_images["image_HSV_H"] = image_HSV[:,:,0]
     processed_images["image_HSV_S"] = image_HSV[:,:,1]
-    #processed_images["image_HSV_V"] = image_HSV[:,:,2]
+    
+    '''
+    A continuación indicamos algunos de los preprocesados que también fueron implementados pero que 
+    al final no fueron usados por no dar el resultado esperado o no necesitarlo para la etapa de extracción
+    de características
+    
+    #Componentes de la image_lab
+    image_lab = color.rgb2lab(color.gray2rgb(image))
+    processed_images["image_lab_l"] = image_lab[:,:,0]
+    processed_images["image_lab_a"] = image_lab[:,:,1]
+    processed_images["image_lab_b"] = image_lab[:,:,2]
+    
+    #El resto de las componentes HSV
+    processed_images["image_HSV_H"] = image_HSV[:,:,0]
+    processed_images["image_HSV_V"] = image_HSV[:,:,2]
+    
+    #Máscara filtrada con medianBlur para descartar las regiones más pequeñas
+    processed_images['image_blur'] = cv2.medianBlur(processed_images['image_mask'], 9)
+    
+    #Imagen en grises tras filtro gaussiano y posteriormente imagen de bordes
+    processed_images["image_bordes_gauss"] = feature.canny(processed_images["image_gray_filtered"], sigma=1.5)
+    processed_images["image_gray_filtered"] = filters.gaussian(processed_images["image_gray"], sigma=1)
+    
+    '''
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -201,98 +208,100 @@ def extractFeatures(processed_images):
     std_gray = np.std(image_gray)
     features.append(std_gray)
 
-
-    canny = np.sum(processed_images["image_bordes"]==1)
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    features.append(canny)
-
+    #Suma de la imagen de bordes
+    features.append(np.sum(processed_images["image_bordes"]==1))
+    
+    #Matriz de co-ocurrencias para analizar la textura de las imágenes entrada
     distances = [4] #Distancia
-
     angles = [0, np.pi/4, np.pi/2, 3*np.pi/4] #Ángulos para la matriz de co-ocurrencias
-
-    properties = ['contrast'] #El contraste sera la propiedad que hallemos a partir de la matriz de co-ocurrencias
     
     ##Hemos probado diferentes descriptores para la matriz de co-ocurrencias.
     #El que mejor resultado ha obtenido ha sido el de contraste
-    
-    #properties2 = ['homogeneity']
-    #properties3 = ['ASM']
-    #properties4 = ['correlation']
-    #properties5 = ['dissimilarity']
-    #properties6 = ['energy']
-
+    properties = ['contrast'] 
     #matriz de co-ocurrencias
     glcm = feature.texture.greycomatrix(processed_images["image_gray_256"], distances=distances, angles=angles, levels=256, symmetric=True, normed=True)
-
     #Calculamos el contraste para las cuatro combinaciones de pares de pixeles según su ángulo
     #Acumulamos en un array los 4 valores que pasaremos como caracteristicas al clasificador
     contrast = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties])
-    
-    #homogeneity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties2])
-    #ASM = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties3])
-    #correlation = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties4])
-    #dissimilarity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties5])
-    #energy = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties6])
+
 
     #Número de objetos detectados en la imagen
     label = measure.label(processed_images["image_sharpening"])
     regions = measure.regionprops(label)
-    nregions = len(regions)
-    features.append(nregions)
+    numregions = len(regions)
+    features.append(numregions)
 
     #Calculamos la transformada de fourier y diferentes caracteristicas
     fourier = np.fft.fft(processed_images["image_gray"])
-
     fase = np.angle(fourier) #Angulo de fase
-
     desviacionFase = np.std(fase)
     features.append(desviacionFase)
     
+    #Componentes RGB
     features.append(np.mean(np.abs(processed_images["image_RGB_R"])))
     features.append(np.mean(np.abs(processed_images["image_RGB_G"])))
     features.append(np.mean(np.abs(processed_images["image_RGB_B"])))
 
-    
+    #Componente saturación de la imagen
     features.append(np.mean(processed_images["image_HSV_S"]))
-
+    
+    #Extración de características a partir de las líneas de Hough
     stdSlope, meanSlope, stdLength, meanLength, num_lines, middlePointX, middlePointY, varSlope, varLength = linesImage(processed_images)
-
     features.append(middlePointY)
-
     features.append(varLength)
     
     '''
-    #dep = np.abs(fourier) ** 2 #Densidad espectral de potencia
-    #mediaDep = np.mean(dep)
-    #mediaFase = np.mean(fase)
-    #desviacionDep = np.std(dep)
-    #features.append(mediaFase)
-    #features.append(mediaDep)
-    #features.append(desviacionDep)
+    ##El resto de las características que se pueden obtener a partir de la matriz de co-ocurrencias
+    properties2 = ['homogeneity']
+    properties3 = ['ASM']
+    properties4 = ['correlation']
+    properties5 = ['dissimilarity']
+    properties6 = ['energy']
+        
+    homogeneity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties2])
+    ASM = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties3])
+    correlation = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties4])
+    dissimilarity = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties5])
+    energy = np.hstack([feature.texture.greycoprops(glcm, prop).ravel() for prop in properties6])
     
-    ##solas no - con las tres sale 76.25
-    #features.append(np.mean(processed_images["image_lab_l"]))
-    #features.append(np.mean(processed_images["image_lab_a"]))
-    #features.append(np.mean(processed_images["image_lab_b"]))
+    #Características de la imagen en el dominio de la frecuencia
+    dep = np.abs(fourier) ** 2 
+    mediaDep = np.mean(dep)
+    mediaFase = np.mean(fase)
+    desviacionDep = np.std(dep)
+    features.append(mediaFase)
+    features.append(mediaDep)
+    features.append(desviacionDep)
+    
+    ##media de las componentes LAB
+    features.append(np.mean(processed_images["image_lab_l"]))
+    features.append(np.mean(processed_images["image_lab_a"]))
+    features.append(np.mean(processed_images["image_lab_b"]))
 
-    #entropyMask = entropy(processed_images["mask_histogram"])
-    #features.append(entropyMask)
+    #Entropía del histograma de la imagen máscara
+    entropyMask = entropy(processed_images["mask_histogram"])
+    features.append(entropyMask)
     
-    #features.append(np.mean(processed_images["image_HSV_H"]))
-    #features.append(np.mean(processed_images["image_HSV_V"]))
+    #Media de las componentes hue y value de la imagen
+    features.append(np.mean(processed_images["image_HSV_H"]))
+    features.append(np.mean(processed_images["image_HSV_V"]))
     
-    #hist_img256, _ = np.histogram(processed_images["image_gray_256"])
-    #norm_hist = hist_img256/np.sum(hist_img256)
-    #ent = entropy(norm_hist)
-    #features.append(ent)
+    #Entropía dl histograma de la imagen en escala de grises de 256 niveles
+    hist_img256, _ = np.histogram(processed_images["image_gray_256"])
+    norm_hist = hist_img256/np.sum(hist_img256)
+    ent = entropy(norm_hist)
+    features.append(ent)
     
-    #features.append(stdSlope)
-    #features.append(meanSlope)
-    #features.append(meanLength)
-    #features.append(num_lines)
-    #features.append(middlePointX)
-    #features.append(varSlope)
+    #Caracteerísticas extraídas a partir de la función que implementa las líneas de Hough de una imagen
+    features.append(stdSlope)
+    features.append(meanSlope)
+    features.append(meanLength)
+    features.append(num_lines)
+    features.append(middlePointX)
+    features.append(varSlope)
     
+    #Cálculo del perímetro y área a partir de la máscara y posterior cálculo de su relación área perímetro
     perimeter = (measure.perimeter(processed_images["image_mask"]))
     if perimeter==0:
         perimeter = 1
