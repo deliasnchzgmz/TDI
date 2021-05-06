@@ -214,7 +214,7 @@ def extractFeatures(processed_images):
     
     #Matriz de co-ocurrencias para analizar la textura de las imágenes entrada
     distances = [4] #Distancia
-    angles = [0, np.pi/4, np.pi/2, 3*np.pi/4] #Ángulos para la matriz de co-ocurrencias
+    angles = [0, np.pi/4, np.pi/2, 3*np.pi/4] #Ángulos para la matriz de coocurrencias
     
     ##Hemos probado diferentes descriptores para la matriz de co-ocurrencias.
     #El que mejor resultado ha obtenido ha sido el de contraste
@@ -414,10 +414,6 @@ def train_classifier(X_train, y_train, X_val = [], y_val = []):
                                                max_iter=200, alpha=0.01, solver='sgd', verbose=2, random_state=1,
                                               learning_rate_init=0.1)
 
-    """
-    for train_indices, val_indices in kf.split(X_train, y_train):
-        model.fit(X_train[train_indices], y_train[train_indices])
-    """
 
     model.fit(X_train, y_train)
 
